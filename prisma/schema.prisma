@@ -1,0 +1,80 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// --- Domain Enums ---
+enum UserRole {
+  ADMIN
+  USER
+}
+
+enum PaymentMethod {
+  CASH
+  PIX
+  CARD
+}
+
+// --- Models ---
+model User {
+  id        Int       @id @default(autoincrement())
+  name      String
+  email     String    @unique
+  password  String
+  role      UserRole  @default(USER)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  comandas  Comanda[]
+}
+
+// Racha = pelada/partida. Slots de horário fixos entre 18 e 23h
+model Racha {
+  id          Int       @id @default(autoincrement())
+  field       String
+  date        DateTime  // Data do dia do racha
+  hour        Int       // Hora inteira 18..23
+  scheduled   Boolean   @default(false)
+  userName    String?   // nome opcional de quem agendou
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Índice único por (date, hour, field) para evitar duplicidade
+  @@unique([date, hour, field])
+}
+
+model Comanda {
+  id          Int            @id @default(autoincrement())
+  userId      Int?
+  user        User?          @relation(fields: [userId], references: [id])
+  customerName String?       // nome opcional na comanda
+  openedAt    DateTime       @default(now())
+  closedAt    DateTime?
+  totalCents  Int            @default(0)
+  payment     PaymentMethod?
+  notes       String?
+
+  items       ComandaItem[]
+}
+
+model ComandaItem {
+  id          Int       @id @default(autoincrement())
+  comandaId   Int
+  description String
+  quantity    Int       @default(1)
+  unitCents   Int       // preço unitário em centavos
+  createdAt   DateTime  @default(now())
+
+  comanda     Comanda   @relation(fields: [comandaId], references: [id])
+}
