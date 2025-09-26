@@ -27,6 +27,9 @@ const router = Router();
  *                 type: integer
  *               notes:
  *                 type: string
+ *               customerName:
+ *                 type: string
+ *                 description: Nome do cliente (opcional)
  *     responses:
  *       201:
  *         description: Comanda aberta

@@ -14,6 +14,36 @@ const VALID_HOURS = [18, 19, 20, 21, 22, 23] as const;
 
 /**
  * @swagger
+ * /rachas:
+ *   get:
+ *     tags: [Rachas]
+ *     summary: Lista rachas
+ *     description: Lista todos os rachas. Use `scheduled=true` para apenas agendados e `scheduled=false` para livres.
+ *     parameters:
+ *       - in: query
+ *         name: scheduled
+ *         required: false
+ *         schema:
+ *           type: boolean
+ *     responses:
+ *       200:
+ *         description: Lista de rachas
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Racha'
+ */
+router.get('/', async (req, res) => {
+  const { scheduled } = req.query as { scheduled?: string };
+  const where = typeof scheduled === 'undefined' ? {} : { scheduled: scheduled === 'true' };
+  const rachas = await prisma.racha.findMany({ where, orderBy: [{ date: 'asc' }, { hour: 'asc' }, { field: 'asc' }] });
+  res.json(rachas);
+});
+
+/**
+ * @swagger
  * /rachas/slots:
  *   get:
  *     tags: [Rachas]
@@ -71,6 +101,9 @@ router.get('/slots', async (req, res) => {
  *               hour:
  *                 type: integer
  *                 enum: [18,19,20,21,22,23]
+ *               userName:
+ *                 type: string
+ *                 description: Nome de quem está agendando (opcional)
  *     responses:
  *       201:
  *         description: Racha agendado

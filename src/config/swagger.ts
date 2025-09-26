@@ -33,6 +33,19 @@ const swaggerDefinition: SwaggerDefinition = {
           }
         }
       },
+      Racha: {
+        type: 'object',
+        properties: {
+          id: { type: 'integer', example: 1 },
+          field: { type: 'string', example: 'Quadra 1' },
+          date: { type: 'string', format: 'date-time', example: '2025-01-25T00:00:00.000Z' },
+          hour: { type: 'integer', enum: [18,19,20,21,22,23] },
+          scheduled: { type: 'boolean', example: true },
+          userName: { type: 'string', nullable: true, example: 'João Silva' },
+          createdAt: { type: 'string', format: 'date-time' },
+          updatedAt: { type: 'string', format: 'date-time' }
+        }
+      },
       Error: {
         type: 'object',
         properties: {
@@ -52,7 +65,7 @@ const swaggerDefinition: SwaggerDefinition = {
 
 const options = {
   definition: swaggerDefinition,
-  apis: ['./src/routes/*.ts', './src/index.ts'], // Caminhos para os arquivos que contêm anotações do Swagger
+  apis: ['./src/routes/*.ts', './src/index.ts'],
 };
 
 export const swaggerSpec = swaggerJsdoc(options);
