@@ -1,14 +1,14 @@
 {
   "_type": "export",
   "__export_format": 4,
-  "__export_date": "2025-01-25T17:55:00.000Z",
+  "__export_date": "2025-01-25T20:00:00.000Z",
   "__export_source": "insomnia.desktop.app:v2023.5.8",
   "resources": [
     {
       "_id": "req_health",
       "parentId": "fld_health",
-      "modified": 1737831300000,
-      "created": 1737831300000,
+      "modified": 1737840000000,
+      "created": 1737840000000,
       "url": "{{ _.base_url }}/health",
       "name": "Health Check",
       "description": "Verifica se a API está funcionando",
@@ -17,7 +17,35 @@
       "parameters": [],
       "headers": [],
       "authentication": {},
-      "metaSortKey": -1737831300000,
+      "metaSortKey": -1737840000000,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    },
+    {
+      "_id": "req_auth_login",
+      "parentId": "fld_auth",
+      "modified": 1737840000000,
+      "created": 1737840000000,
+      "url": "{{ _.base_url }}/auth/login",
+      "name": "Login Admin",
+      "description": "Realiza login e retorna JWT para admin",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"email\": \"admin@pinheirosociety.com\",\n  \"password\": \"admin123\"\n}"
+      },
+      "parameters": [],
+      "headers": [
+        { "name": "Content-Type", "value": "application/json" }
+      ],
+      "authentication": {},
+      "metaSortKey": -1737840000000,
       "isPrivate": false,
       "settingStoreCookies": true,
       "settingSendCookies": true,
@@ -30,8 +58,8 @@
     {
       "_id": "req_users_list",
       "parentId": "fld_users",
-      "modified": 1737831300000,
-      "created": 1737831300000,
+      "modified": 1737840000000,
+      "created": 1737840000000,
       "url": "{{ _.base_url }}/users",
       "name": "Listar Usuários",
       "description": "Lista todos os usuários cadastrados",
@@ -40,38 +68,7 @@
       "parameters": [],
       "headers": [],
       "authentication": {},
-      "metaSortKey": -1737831300000,
-      "isPrivate": false,
-      "settingStoreCookies": true,
-      "settingSendCookies": true,
-      "settingDisableRenderRequestBody": false,
-      "settingEncodeUrl": true,
-      "settingRebuildPath": true,
-      "settingFollowRedirects": "global",
-      "_type": "request"
-    },
-    {
-      "_id": "req_users_create",
-      "parentId": "fld_users",
-      "modified": 1737831300000,
-      "created": 1737831300000,
-      "url": "{{ _.base_url }}/users",
-      "name": "Criar Usuário",
-      "description": "Cria um novo usuário",
-      "method": "POST",
-      "body": {
-        "mimeType": "application/json",
-        "text": "{\n  \"name\": \"João Silva\",\n  \"email\": \"joao@email.com\",\n  \"password\": \"123456\",\n  \"role\": \"USER\"\n}"
-      },
-      "parameters": [],
-      "headers": [
-        {
-          "name": "Content-Type",
-          "value": "application/json"
-        }
-      ],
-      "authentication": {},
-      "metaSortKey": -1737831300001,
+      "metaSortKey": -1737840000000,
       "isPrivate": false,
       "settingStoreCookies": true,
       "settingSendCookies": true,
@@ -84,8 +81,8 @@
     {
       "_id": "req_users_create_admin",
       "parentId": "fld_users",
-      "modified": 1737831300000,
-      "created": 1737831300000,
+      "modified": 1737840000000,
+      "created": 1737840000000,
       "url": "{{ _.base_url }}/users",
       "name": "Criar Admin",
       "description": "Cria um usuário administrador",
@@ -96,13 +93,135 @@
       },
       "parameters": [],
       "headers": [
-        {
-          "name": "Content-Type",
-          "value": "application/json"
-        }
+        { "name": "Content-Type", "value": "application/json" }
       ],
       "authentication": {},
-      "metaSortKey": -1737831300002,
+      "metaSortKey": -1737840000001,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    },
+    {
+      "_id": "req_produtos_list",
+      "parentId": "fld_produtos",
+      "modified": 1737840000000,
+      "created": 1737840000000,
+      "url": "{{ _.base_url }}/produtos",
+      "name": "Listar Produtos",
+      "description": "Lista todos os produtos",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [],
+      "authentication": {},
+      "metaSortKey": -1737840000000,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    },
+    {
+      "_id": "req_produtos_create",
+      "parentId": "fld_produtos",
+      "modified": 1737840000000,
+      "created": 1737840000000,
+      "url": "{{ _.base_url }}/produtos",
+      "name": "Criar Produto",
+      "description": "Cria um novo produto com estoque",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"name\": \"Cerveja Skol 350ml\",\n  \"description\": \"Cerveja gelada\",\n  \"category\": \"BEBIDA\",\n  \"priceCents\": 500,\n  \"quantidade\": 100,\n  \"minQuantidade\": 10\n}"
+      },
+      "parameters": [],
+      "headers": [
+        { "name": "Content-Type", "value": "application/json" }
+      ],
+      "authentication": {},
+      "metaSortKey": -1737840000001,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    },
+    {
+      "_id": "req_produtos_estoque_baixo",
+      "parentId": "fld_produtos",
+      "modified": 1737840000000,
+      "created": 1737840000000,
+      "url": "{{ _.base_url }}/produtos/estoque-baixo",
+      "name": "Estoque Baixo",
+      "description": "Lista produtos com estoque baixo",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [],
+      "authentication": {},
+      "metaSortKey": -1737840000002,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    },
+    {
+      "_id": "req_produtos_update_estoque",
+      "parentId": "fld_produtos",
+      "modified": 1737840000000,
+      "created": 1737840000000,
+      "url": "{{ _.base_url }}/produtos/1/estoque",
+      "name": "Atualizar Estoque",
+      "description": "Atualiza quantidade do estoque",
+      "method": "PUT",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"quantidade\": 150,\n  \"minQuantidade\": 15\n}"
+      },
+      "parameters": [],
+      "headers": [
+        { "name": "Content-Type", "value": "application/json" }
+      ],
+      "authentication": {},
+      "metaSortKey": -1737840000003,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    },
+    {
+      "_id": "req_rachas_list",
+      "parentId": "fld_rachas",
+      "modified": 1737840000000,
+      "created": 1737840000000,
+      "url": "{{ _.base_url }}/rachas",
+      "name": "Listar Rachas",
+      "description": "Lista todos os rachas",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [],
+      "authentication": {},
+      "metaSortKey": -1737840000000,
       "isPrivate": false,
       "settingStoreCookies": true,
       "settingSendCookies": true,
@@ -115,8 +234,8 @@
     {
       "_id": "req_rachas_slots",
       "parentId": "fld_rachas",
-      "modified": 1737831300000,
-      "created": 1737831300000,
+      "modified": 1737840000000,
+      "created": 1737840000000,
       "url": "{{ _.base_url }}/rachas/slots",
       "name": "Ver Horários Disponíveis",
       "description": "Lista horários disponíveis para uma data e campo",
@@ -136,7 +255,7 @@
       ],
       "headers": [],
       "authentication": {},
-      "metaSortKey": -1737831300000,
+      "metaSortKey": -1737840000001,
       "isPrivate": false,
       "settingStoreCookies": true,
       "settingSendCookies": true,
@@ -149,25 +268,73 @@
     {
       "_id": "req_rachas_create",
       "parentId": "fld_rachas",
-      "modified": 1737831300000,
-      "created": 1737831300000,
+      "modified": 1737840000000,
+      "created": 1737840000000,
       "url": "{{ _.base_url }}/rachas",
       "name": "Agendar Racha",
       "description": "Agenda um novo racha",
       "method": "POST",
       "body": {
         "mimeType": "application/json",
-        "text": "{\n  \"date\": \"2025-01-25\",\n  \"field\": \"Quadra 1\",\n  \"hour\": 18,\n  \"userName\": \"João\"\n}"
+        "text": "{\n  \"date\": \"2025-01-25\",\n  \"field\": \"Quadra 1\",\n  \"hour\": 18,\n  \"userName\": \"João\",\n  \"recorrente\": false\n}"
       },
       "parameters": [],
       "headers": [
-        {
-          "name": "Content-Type",
-          "value": "application/json"
-        }
+        { "name": "Content-Type", "value": "application/json" }
       ],
       "authentication": {},
-      "metaSortKey": -1737831300001,
+      "metaSortKey": -1737840000002,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    },
+    {
+      "_id": "req_rachas_create_recurrent",
+      "parentId": "fld_rachas",
+      "modified": 1737840000000,
+      "created": 1737840000000,
+      "url": "{{ _.base_url }}/rachas",
+      "name": "Agendar Racha Recorrente",
+      "description": "Agenda um racha que se repete semanalmente",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"date\": \"2025-01-25\",\n  \"field\": \"Quadra 1\",\n  \"hour\": 18,\n  \"userName\": \"João\",\n  \"recorrente\": true\n}"
+      },
+      "parameters": [],
+      "headers": [
+        { "name": "Content-Type", "value": "application/json" }
+      ],
+      "authentication": {},
+      "metaSortKey": -1737840000003,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    },
+    {
+      "_id": "req_rachas_desativar",
+      "parentId": "fld_rachas",
+      "modified": 1737840000000,
+      "created": 1737840000000,
+      "url": "{{ _.base_url }}/rachas/1/desativar",
+      "name": "Desativar Racha Recorrente",
+      "description": "Desativa rachas recorrentes futuros",
+      "method": "POST",
+      "body": {},
+      "parameters": [],
+      "headers": [],
+      "authentication": {},
+      "metaSortKey": -1737840000004,
       "isPrivate": false,
       "settingStoreCookies": true,
       "settingSendCookies": true,
@@ -180,8 +347,8 @@
     {
       "_id": "req_comandas_create",
       "parentId": "fld_comandas",
-      "modified": 1737831300000,
-      "created": 1737831300000,
+      "modified": 1737840000000,
+      "created": 1737840000000,
       "url": "{{ _.base_url }}/comandas",
       "name": "Abrir Comanda",
       "description": "Abre uma nova comanda",
@@ -192,13 +359,10 @@
       },
       "parameters": [],
       "headers": [
-        {
-          "name": "Content-Type",
-          "value": "application/json"
-        }
+        { "name": "Content-Type", "value": "application/json" }
       ],
       "authentication": {},
-      "metaSortKey": -1737831300000,
+      "metaSortKey": -1737840000000,
       "isPrivate": false,
       "settingStoreCookies": true,
       "settingSendCookies": true,
@@ -211,8 +375,8 @@
     {
       "_id": "req_comandas_get",
       "parentId": "fld_comandas",
-      "modified": 1737831300000,
-      "created": 1737831300000,
+      "modified": 1737840000000,
+      "created": 1737840000000,
       "url": "{{ _.base_url }}/comandas/1",
       "name": "Ver Comanda",
       "description": "Obtém detalhes de uma comanda",
@@ -221,7 +385,7 @@
       "parameters": [],
       "headers": [],
       "authentication": {},
-      "metaSortKey": -1737831300001,
+      "metaSortKey": -1737840000001,
       "isPrivate": false,
       "settingStoreCookies": true,
       "settingSendCookies": true,
@@ -232,27 +396,52 @@
       "_type": "request"
     },
     {
-      "_id": "req_comandas_add_item",
+      "_id": "req_comandas_add_produto",
       "parentId": "fld_comandas",
-      "modified": 1737831300000,
-      "created": 1737831300000,
+      "modified": 1737840000000,
+      "created": 1737840000000,
       "url": "{{ _.base_url }}/comandas/1/itens",
-      "name": "Adicionar Item",
-      "description": "Adiciona um item na comanda",
+      "name": "Adicionar Produto",
+      "description": "Adiciona um produto do estoque na comanda",
       "method": "POST",
       "body": {
         "mimeType": "application/json",
-        "text": "{\n  \"description\": \"Cerveja Skol 350ml\",\n  \"quantity\": 2,\n  \"unitCents\": 500\n}"
+        "text": "{\n  \"produtoId\": 1,\n  \"quantity\": 2\n}"
       },
       "parameters": [],
       "headers": [
-        {
-          "name": "Content-Type",
-          "value": "application/json"
-        }
+        { "name": "Content-Type", "value": "application/json" }
       ],
       "authentication": {},
-      "metaSortKey": -1737831300002,
+      "metaSortKey": -1737840000002,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    },
+    {
+      "_id": "req_comandas_add_custom",
+      "parentId": "fld_comandas",
+      "modified": 1737840000000,
+      "created": 1737840000000,
+      "url": "{{ _.base_url }}/comandas/1/itens",
+      "name": "Adicionar Item Customizado",
+      "description": "Adiciona um item customizado na comanda",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"description\": \"Hambúrguer Artesanal\",\n  \"quantity\": 1,\n  \"unitCents\": 1500\n}"
+      },
+      "parameters": [],
+      "headers": [
+        { "name": "Content-Type", "value": "application/json" }
+      ],
+      "authentication": {},
+      "metaSortKey": -1737840000003,
       "isPrivate": false,
       "settingStoreCookies": true,
       "settingSendCookies": true,
@@ -265,8 +454,8 @@
     {
       "_id": "req_comandas_close",
       "parentId": "fld_comandas",
-      "modified": 1737831300000,
-      "created": 1737831300000,
+      "modified": 1737840000000,
+      "created": 1737840000000,
       "url": "{{ _.base_url }}/comandas/1/fechar",
       "name": "Fechar Comanda",
       "description": "Fecha uma comanda com forma de pagamento",
@@ -277,13 +466,101 @@
       },
       "parameters": [],
       "headers": [
-        {
-          "name": "Content-Type",
-          "value": "application/json"
-        }
+        { "name": "Content-Type", "value": "application/json" }
       ],
       "authentication": {},
-      "metaSortKey": -1737831300003,
+      "metaSortKey": -1737840000004,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    },
+    {
+      "_id": "req_relatorios_faturamento",
+      "parentId": "fld_relatorios",
+      "modified": 1737840000000,
+      "created": 1737840000000,
+      "url": "{{ _.base_url }}/relatorios/faturamento",
+      "name": "Relatório de Faturamento",
+      "description": "Relatório de faturamento por período",
+      "method": "GET",
+      "body": {},
+      "parameters": [
+        {
+          "name": "dataInicio",
+          "value": "2025-01-01",
+          "description": "Data de início (YYYY-MM-DD)"
+        },
+        {
+          "name": "dataFim",
+          "value": "2025-01-31",
+          "description": "Data de fim (YYYY-MM-DD)"
+        }
+      ],
+      "headers": [],
+      "authentication": {},
+      "metaSortKey": -1737840000000,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    },
+    {
+      "_id": "req_relatorios_rachas",
+      "parentId": "fld_relatorios",
+      "modified": 1737840000000,
+      "created": 1737840000000,
+      "url": "{{ _.base_url }}/relatorios/rachas",
+      "name": "Relatório de Rachas",
+      "description": "Relatório de rachas por período",
+      "method": "GET",
+      "body": {},
+      "parameters": [
+        {
+          "name": "dataInicio",
+          "value": "2025-01-01",
+          "description": "Data de início (YYYY-MM-DD)"
+        },
+        {
+          "name": "dataFim",
+          "value": "2025-01-31",
+          "description": "Data de fim (YYYY-MM-DD)"
+        }
+      ],
+      "headers": [],
+      "authentication": {},
+      "metaSortKey": -1737840000001,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    },
+    {
+      "_id": "req_relatorios_dashboard",
+      "parentId": "fld_relatorios",
+      "modified": 1737840000000,
+      "created": 1737840000000,
+      "url": "{{ _.base_url }}/relatorios/dashboard",
+      "name": "Dashboard",
+      "description": "Dashboard com resumo geral",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [],
+      "authentication": {},
+      "metaSortKey": -1737840000002,
       "isPrivate": false,
       "settingStoreCookies": true,
       "settingSendCookies": true,
@@ -296,117 +573,113 @@
     {
       "_id": "env_base",
       "parentId": "wrk_pinheiro_api",
-      "modified": 1737831300000,
-      "created": 1737831300000,
+      "modified": 1737840000000,
+      "created": 1737840000000,
       "name": "Base Environment",
       "data": {
-        "base_url": "http://localhost:3000",
+        "base_url": "https://pinheiro-society-api.vercel.app",
         "token": ""
       },
       "dataPropertyOrder": {
-        "&": ["base_url","token"]
+        "&": ["base_url", "token"]
       },
       "color": null,
       "isPrivate": false,
-      "metaSortKey": 1737831300000,
+      "metaSortKey": 1737840000000,
       "_type": "environment"
-    },
-    {
-      "_id": "fld_auth",
-      "parentId": "wrk_pinheiro_api",
-      "modified": 1737831300000,
-      "created": 1737831300000,
-      "name": "Auth",
-      "description": "Login de administrador e autenticação",
-      "environment": {},
-      "environmentPropertyOrder": null,
-      "metaSortKey": -1737831300004,
-      "_type": "request_group"
-    },
-    {
-      "_id": "req_auth_login",
-      "parentId": "fld_auth",
-      "modified": 1737831300000,
-      "created": 1737831300000,
-      "url": "{{ _.base_url }}/auth/login",
-      "name": "Login Admin",
-      "description": "Realiza login e retorna JWT para admin",
-      "method": "POST",
-      "body": {
-        "mimeType": "application/json",
-        "text": "{\n  \"email\": \"admin@pinheirosociety.com\",\n  \"password\": \"admin123\"\n}"
-      },
-      "parameters": [],
-      "headers": [
-        { "name": "Content-Type", "value": "application/json" }
-      ],
-      "authentication": {},
-      "metaSortKey": -1737831300000,
-      "isPrivate": false,
-      "settingStoreCookies": true,
-      "settingSendCookies": true,
-      "settingDisableRenderRequestBody": false,
-      "settingEncodeUrl": true,
-      "settingRebuildPath": true,
-      "settingFollowRedirects": "global",
-      "_type": "request"
     },
     {
       "_id": "wrk_pinheiro_api",
       "parentId": null,
-      "modified": 1737831300000,
-      "created": 1737831300000,
+      "modified": 1737840000000,
+      "created": 1737840000000,
       "name": "PinheiroSocietyAPI",
-      "description": "Coleção de testes para a API da Pinheiro Society",
+      "description": "Coleção completa com estoque, relatórios e rachas recorrentes",
       "scope": "collection",
       "_type": "workspace"
     },
     {
       "_id": "fld_health",
       "parentId": "wrk_pinheiro_api",
-      "modified": 1737831300000,
-      "created": 1737831300000,
+      "modified": 1737840000000,
+      "created": 1737840000000,
       "name": "Health",
       "description": "Endpoints de verificação de saúde da API",
       "environment": {},
       "environmentPropertyOrder": null,
-      "metaSortKey": -1737831300000,
+      "metaSortKey": -1737840000000,
+      "_type": "request_group"
+    },
+    {
+      "_id": "fld_auth",
+      "parentId": "wrk_pinheiro_api",
+      "modified": 1737840000000,
+      "created": 1737840000000,
+      "name": "Auth",
+      "description": "Autenticação e login",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": -1737840000001,
       "_type": "request_group"
     },
     {
       "_id": "fld_users",
       "parentId": "wrk_pinheiro_api",
-      "modified": 1737831300000,
-      "created": 1737831300000,
+      "modified": 1737840000000,
+      "created": 1737840000000,
       "name": "Users",
       "description": "Gestão de usuários (ADMIN e USER)",
       "environment": {},
       "environmentPropertyOrder": null,
-      "metaSortKey": -1737831300001,
+      "metaSortKey": -1737840000002,
+      "_type": "request_group"
+    },
+    {
+      "_id": "fld_produtos",
+      "parentId": "wrk_pinheiro_api",
+      "modified": 1737840000000,
+      "created": 1737840000000,
+      "name": "Produtos",
+      "description": "Gestão de produtos e estoque",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": -1737840000003,
       "_type": "request_group"
     },
     {
       "_id": "fld_rachas",
       "parentId": "wrk_pinheiro_api",
-      "modified": 1737831300000,
-      "created": 1737831300000,
+      "modified": 1737840000000,
+      "created": 1737840000000,
       "name": "Rachas",
-      "description": "Gestão de rachas e horários (18h-23h)",
+      "description": "Gestão de rachas e horários (18h-23h) com suporte a recorrentes",
       "environment": {},
       "environmentPropertyOrder": null,
-      "metaSortKey": -1737831300002,
+      "metaSortKey": -1737840000004,
       "_type": "request_group"
     },
     {
       "_id": "fld_comandas",
       "parentId": "wrk_pinheiro_api",
-      "modified": 1737831300000,
-      "created": 1737831300000,
+      "modified": 1737840000000,
+      "created": 1737840000000,
       "name": "Comandas",
-      "description": "Gestão de comandas e vendas",
+      "description": "Gestão de comandas com produtos do estoque",
       "environment": {},
       "environmentPropertyOrder": null,
-      "metaSortKey": -1737831300003,
+      "metaSortKey": -1737840000005,
+      "_type": "request_group"
+    },
+    {
+      "_id": "fld_relatorios",
+      "parentId": "wrk_pinheiro_api",
+      "modified": 1737840000000,
+      "created": 1737840000000,
+      "name": "Relatórios",
+      "description": "Relatórios de faturamento e vendas",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": -1737840000006,
       "_type": "request_group"
     }
   ]
