@@ -8,6 +8,8 @@ import usersRouter from './routes/users.js';
 import rachasRouter from './routes/rachas.js';
 import comandasRouter from './routes/comandas.js';
 import authRouter from './routes/auth.js';
+import produtosRouter from './routes/produtos.js';
+import relatoriosRouter from './routes/relatorios.js';
 
 const app = express();
 app.use(helmet());
@@ -25,6 +27,8 @@ app.use('/users', usersRouter);
 app.use('/rachas', rachasRouter);
 app.use('/comandas', comandasRouter);
 app.use('/auth', authRouter);
+app.use('/produtos', produtosRouter);
+app.use('/relatorios', relatoriosRouter);
 
 /**
  * @swagger

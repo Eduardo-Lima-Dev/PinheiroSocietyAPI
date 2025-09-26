@@ -42,7 +42,34 @@ const swaggerDefinition: SwaggerDefinition = {
           hour: { type: 'integer', enum: [18,19,20,21,22,23] },
           scheduled: { type: 'boolean', example: true },
           userName: { type: 'string', nullable: true, example: 'João Silva' },
+          recorrente: { type: 'boolean', example: false },
+          diaSemana: { type: 'integer', nullable: true, example: 1 },
+          ativo: { type: 'boolean', example: true },
           createdAt: { type: 'string', format: 'date-time' },
+          updatedAt: { type: 'string', format: 'date-time' }
+        }
+      },
+      Produto: {
+        type: 'object',
+        properties: {
+          id: { type: 'integer', example: 1 },
+          name: { type: 'string', example: 'Cerveja Skol 350ml' },
+          description: { type: 'string', nullable: true, example: 'Cerveja gelada' },
+          category: { type: 'string', enum: ['BEBIDA', 'COMIDA', 'SNACK', 'OUTROS'] },
+          priceCents: { type: 'integer', example: 500 },
+          active: { type: 'boolean', example: true },
+          createdAt: { type: 'string', format: 'date-time' },
+          updatedAt: { type: 'string', format: 'date-time' },
+          estoque: { $ref: '#/components/schemas/Estoque' }
+        }
+      },
+      Estoque: {
+        type: 'object',
+        properties: {
+          id: { type: 'integer', example: 1 },
+          produtoId: { type: 'integer', example: 1 },
+          quantidade: { type: 'integer', example: 50 },
+          minQuantidade: { type: 'integer', example: 10 },
           updatedAt: { type: 'string', format: 'date-time' }
         }
       },

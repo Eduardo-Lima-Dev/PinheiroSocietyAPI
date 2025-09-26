@@ -83,30 +83,90 @@ router.get('/:id', async (req, res) => {
  *         application/json:
  *           schema:
  *             type: object
- *             required: [description, quantity, unitCents]
+ *             required: [quantity]
  *             properties:
+ *               produtoId:
+ *                 type: integer
+ *                 description: ID do produto (opcional, se não informado será item customizado)
  *               description:
  *                 type: string
+ *                 description: Descrição do item (obrigatório se produtoId não informado)
  *               quantity:
  *                 type: integer
  *                 minimum: 1
  *               unitCents:
  *                 type: integer
  *                 minimum: 0
+ *                 description: Preço unitário (obrigatório se produtoId não informado)
  *     responses:
  *       201:
  *         description: Item adicionado
+ *       400:
+ *         description: Produto não encontrado ou estoque insuficiente
  */
 router.post('/:id/itens', async (req, res) => {
   const id = Number(req.params.id);
-  const { description, quantity, unitCents } = req.body as { description: string; quantity: number; unitCents: number };
+  const { produtoId, description, quantity, unitCents } = req.body as { 
+    produtoId?: number; 
+    description?: string; 
+    quantity: number; 
+    unitCents?: number; 
+  };
 
-  const item = await prisma.comandaItem.create({ data: { comandaId: id, description, quantity, unitCents } });
-  // atualiza total
-  const sum = await prisma.comandaItem.aggregate({ where: { comandaId: id }, _sum: { quantity: true, unitCents: true } });
+  let finalDescription = description;
+  let finalUnitCents = unitCents;
+
+  // Se produtoId foi informado, buscar produto e verificar estoque
+  if (produtoId) {
+    const produto = await prisma.produto.findUnique({
+      where: { id: produtoId, active: true },
+      include: { estoque: true }
+    });
+
+    if (!produto) {
+      return res.status(400).json({ message: 'Produto não encontrado ou inativo' });
+    }
+
+    if (produto.estoque && produto.estoque.quantidade < quantity) {
+      return res.status(400).json({ 
+        message: 'Estoque insuficiente', 
+        disponivel: produto.estoque.quantidade,
+        solicitado: quantity 
+      });
+    }
+
+    finalDescription = produto.name;
+    finalUnitCents = produto.priceCents;
+
+    // Atualizar estoque
+    if (produto.estoque) {
+      await prisma.estoque.update({
+        where: { produtoId },
+        data: { quantidade: produto.estoque.quantidade - quantity }
+      });
+    }
+  } else {
+    // Item customizado - validar campos obrigatórios
+    if (!description || !unitCents) {
+      return res.status(400).json({ message: 'Para itens customizados, description e unitCents são obrigatórios' });
+    }
+  }
+
+  const item = await prisma.comandaItem.create({ 
+    data: { 
+      comandaId: id, 
+      produtoId: produtoId || null,
+      description: finalDescription!, 
+      quantity, 
+      unitCents: finalUnitCents! 
+    } 
+  });
+
+  // Atualizar total da comanda
   const items = await prisma.comandaItem.findMany({ where: { comandaId: id } });
   const totalCents = items.reduce((acc, it) => acc + it.quantity * it.unitCents, 0);
   await prisma.comanda.update({ where: { id }, data: { totalCents } });
+  
   res.status(201).json(item);
 });
 

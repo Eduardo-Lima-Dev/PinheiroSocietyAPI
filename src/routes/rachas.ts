@@ -104,6 +104,10 @@ router.get('/slots', async (req, res) => {
  *               userName:
  *                 type: string
  *                 description: Nome de quem está agendando (opcional)
+ *               recorrente:
+ *                 type: boolean
+ *                 default: false
+ *                 description: Se o racha deve se repetir semanalmente
  *     responses:
  *       201:
  *         description: Racha agendado
@@ -111,18 +115,116 @@ router.get('/slots', async (req, res) => {
  *         description: Horário já reservado
  */
 router.post('/', async (req, res) => {
-  const { date, field, hour, userName } = req.body as { date: string; field: string; hour: number; userName?: string };
+  const { date, field, hour, userName, recorrente = false } = req.body as { 
+    date: string; 
+    field: string; 
+    hour: number; 
+    userName?: string; 
+    recorrente?: boolean; 
+  };
 
   if (!VALID_HOURS.includes(hour as any)) return res.status(400).json({ message: 'Hora inválida (18..23)' });
 
   const day = new Date(date + 'T00:00:00');
+  const diaSemana = recorrente ? day.getDay() : null;
 
   try {
-    const created = await prisma.racha.create({ data: { date: day, field, hour, scheduled: true, userName: userName ?? null } });
-    res.status(201).json(created);
+    if (recorrente) {
+      // Para rachas recorrentes, criar para as próximas 12 semanas
+      const rachas = [];
+      for (let i = 0; i < 12; i++) {
+        const dataRacha = new Date(day);
+        dataRacha.setDate(day.getDate() + (i * 7));
+        
+        try {
+          const racha = await prisma.racha.create({
+            data: {
+              date: dataRacha,
+              field,
+              hour,
+              scheduled: true,
+              userName: userName ?? null,
+              recorrente: true,
+              diaSemana
+            }
+          });
+          rachas.push(racha);
+        } catch (e) {
+          // Ignora conflitos para datas futuras
+          console.log(`Conflito na data ${dataRacha.toISOString()}, pulando...`);
+        }
+      }
+      res.status(201).json({ message: 'Rachas recorrentes criados', rachas });
+    } else {
+      const created = await prisma.racha.create({ 
+        data: { 
+          date: day, 
+          field, 
+          hour, 
+          scheduled: true, 
+          userName: userName ?? null,
+          recorrente: false,
+          diaSemana: null
+        } 
+      });
+      res.status(201).json(created);
+    }
   } catch (e) {
     return res.status(409).json({ message: 'Já existe racha para esse campo/hora/data' });
   }
+});
+
+/**
+ * @swagger
+ * /rachas/{id}/desativar:
+ *   post:
+ *     tags: [Rachas]
+ *     summary: Desativa um racha recorrente
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Racha desativado
+ *       404:
+ *         description: Racha não encontrado
+ */
+router.post('/:id/desativar', async (req, res) => {
+  const id = Number(req.params.id);
+  
+  const racha = await prisma.racha.findUnique({ where: { id } });
+  if (!racha) return res.status(404).json({ message: 'Racha não encontrado' });
+  
+  if (!racha.recorrente) {
+    return res.status(400).json({ message: 'Apenas rachas recorrentes podem ser desativados' });
+  }
+  
+  // Desativa todos os rachas recorrentes futuros com mesmo campo, hora e dia da semana
+  const hoje = new Date();
+  hoje.setHours(0, 0, 0, 0);
+  
+  const updated = await prisma.racha.updateMany({
+    where: {
+      field: racha.field,
+      hour: racha.hour,
+      diaSemana: racha.diaSemana,
+      date: { gte: hoje },
+      recorrente: true,
+      ativo: true
+    },
+    data: { ativo: false }
+  });
+  
+  res.json({ 
+    message: 'Rachas recorrentes desativados', 
+    count: updated.count,
+    field: racha.field,
+    hour: racha.hour,
+    diaSemana: racha.diaSemana
+  });
 });
 
 export default router;
