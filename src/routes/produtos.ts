@@ -200,20 +200,25 @@ router.put('/:id/estoque', async (req, res) => {
  *         description: Lista de produtos com estoque baixo
  */
 router.get('/estoque-baixo', async (req, res) => {
+  // Buscar produtos ativos com estoque
   const produtos = await prisma.produto.findMany({
     where: {
       active: true,
       estoque: {
-        quantidade: {
-          lte: prisma.estoque.fields.minQuantidade
-        }
+        isNot: null
       }
     },
     include: { estoque: true },
     orderBy: { name: 'asc' }
   });
 
-  res.json(produtos);
+  // Filtrar produtos com estoque baixo
+  const produtosEstoqueBaixo = produtos.filter(produto => {
+    if (!produto.estoque) return false;
+    return produto.estoque.quantidade <= produto.estoque.minQuantidade;
+  });
+
+  res.json(produtosEstoqueBaixo);
 });
 
 export default router;

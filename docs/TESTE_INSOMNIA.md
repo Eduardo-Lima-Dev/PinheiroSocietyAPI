@@ -15,8 +15,8 @@ npm run dev
 ```
 
 ### 2. **Configure o ambiente**
-- A coleção já vem com a variável `base_url` configurada para `https://pinheiro-society-api.vercel.app`
-- Para teste local, altere para `http://localhost:3000`
+- A coleção já vem com a variável `base_url` configurada para `http://localhost:3000`
+- Para teste em produção, altere para `https://pinheiro-society-api.vercel.app`
 
 ### 3. **Sequência de testes recomendada**
 

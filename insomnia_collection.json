@@ -577,7 +577,7 @@
       "created": 1737840000000,
       "name": "Base Environment",
       "data": {
-        "base_url": "https://pinheiro-society-api.vercel.app",
+        "base_url": "http://localhost:3000",
         "token": ""
       },
       "dataPropertyOrder": {

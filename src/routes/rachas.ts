@@ -111,8 +111,34 @@ router.get('/slots', async (req, res) => {
  *     responses:
  *       201:
  *         description: Racha agendado
+ *       400:
+ *         description: Hora inválida
  *       409:
- *         description: Horário já reservado
+ *         description: Conflito de horário/campo/data
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 conflitos:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       date:
+ *                         type: string
+ *                       field:
+ *                         type: string
+ *                       hour:
+ *                         type: integer
+ *                       message:
+ *                         type: string
+ *                 rachasCriados:
+ *                   type: integer
+ *                 totalTentativas:
+ *                   type: integer
  */
 router.post('/', async (req, res) => {
   const { date, field, hour, userName, recorrente = false } = req.body as { 
@@ -130,31 +156,66 @@ router.post('/', async (req, res) => {
 
   try {
     if (recorrente) {
-      // Para rachas recorrentes, criar para as próximas 12 semanas
+      // Para rachas recorrentes, verificar conflitos antes de criar
+      const conflitos = [];
       const rachas = [];
+      
       for (let i = 0; i < 12; i++) {
         const dataRacha = new Date(day);
         dataRacha.setDate(day.getDate() + (i * 7));
         
-        try {
-          const racha = await prisma.racha.create({
-            data: {
-              date: dataRacha,
+        // Verificar se já existe racha para esta data/hora/campo
+        const rachaExistente = await prisma.racha.findFirst({
+          where: {
+            date: dataRacha,
+            field,
+            hour,
+            scheduled: true
+          }
+        });
+        
+        if (rachaExistente) {
+          conflitos.push({
+            date: dataRacha.toISOString().split('T')[0],
+            field,
+            hour,
+            message: `Já existe racha agendado para ${dataRacha.toLocaleDateString('pt-BR')} às ${hour}:00 no campo ${field}`
+          });
+        } else {
+          try {
+            const racha = await prisma.racha.create({
+              data: {
+                date: dataRacha,
+                field,
+                hour,
+                scheduled: true,
+                userName: userName ?? null,
+                recorrente: true,
+                diaSemana
+              }
+            });
+            rachas.push(racha);
+          } catch (e) {
+            conflitos.push({
+              date: dataRacha.toISOString().split('T')[0],
               field,
               hour,
-              scheduled: true,
-              userName: userName ?? null,
-              recorrente: true,
-              diaSemana
-            }
-          });
-          rachas.push(racha);
-        } catch (e) {
-          // Ignora conflitos para datas futuras
-          console.log(`Conflito na data ${dataRacha.toISOString()}, pulando...`);
+              message: `Erro ao criar racha para ${dataRacha.toLocaleDateString('pt-BR')} às ${hour}:00 no campo ${field}`
+            });
+          }
         }
       }
-      res.status(201).json({ message: 'Rachas recorrentes criados', rachas });
+      
+      if (conflitos.length > 0) {
+        return res.status(409).json({ 
+          message: 'Conflitos encontrados ao criar rachas recorrentes',
+          conflitos,
+          rachasCriados: rachas.length,
+          totalTentativas: 12
+        });
+      }
+      
+      res.status(201).json({ message: 'Rachas recorrentes criados com sucesso', rachas });
     } else {
       const created = await prisma.racha.create({ 
         data: { 
