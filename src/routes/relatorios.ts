@@ -34,14 +34,29 @@ const router = Router();
  *         description: Relatório de faturamento
  */
 router.get('/faturamento', async (req, res) => {
-  const { dataInicio, dataFim } = req.query as { dataInicio: string; dataFim: string };
+  const { dataInicio, dataFim } = req.query;
   
   if (!dataInicio || !dataFim) {
     return res.status(400).json({ message: 'dataInicio e dataFim são obrigatórios' });
   }
 
-  const inicio = new Date(dataInicio + 'T00:00:00');
-  const fim = new Date(dataFim + 'T23:59:59');
+  // Converter para string e limpar espaços
+  const dataInicioStr = String(dataInicio).trim();
+  const dataFimStr = String(dataFim).trim();
+
+  // Validar formato YYYY-MM-DD
+  const formatoData = /^\d{4}-\d{2}-\d{2}$/;
+  if (!formatoData.test(dataInicioStr) || !formatoData.test(dataFimStr)) {
+    return res.status(400).json({ message: 'Formato de data inválido. Use YYYY-MM-DD' });
+  }
+
+  const inicio = new Date(dataInicioStr + 'T00:00:00');
+  const fim = new Date(dataFimStr + 'T23:59:59');
+
+  // Validar se as datas são válidas
+  if (isNaN(inicio.getTime()) || isNaN(fim.getTime())) {
+    return res.status(400).json({ message: 'Formato de data inválido. Use YYYY-MM-DD' });
+  }
 
   // Faturamento de comandas
   const comandas = await prisma.comanda.findMany({
@@ -54,7 +69,7 @@ router.get('/faturamento', async (req, res) => {
     },
     include: {
       items: true,
-      user: { select: { name: true } }
+      cliente: { select: { nomeCompleto: true, telefone: true } }
     }
   });
 
@@ -100,83 +115,6 @@ router.get('/faturamento', async (req, res) => {
   });
 });
 
-/**
- * @swagger
- * /relatorios/rachas:
- *   get:
- *     tags: [Relatórios]
- *     summary: Relatório de rachas por período
- *     parameters:
- *       - in: query
- *         name: dataInicio
- *         required: true
- *         schema:
- *           type: string
- *           format: date
- *       - in: query
- *         name: dataFim
- *         required: true
- *         schema:
- *           type: string
- *           format: date
- *     responses:
- *       200:
- *         description: Relatório de rachas
- */
-router.get('/rachas', async (req, res) => {
-  const { dataInicio, dataFim } = req.query as { dataInicio: string; dataFim: string };
-  
-  if (!dataInicio || !dataFim) {
-    return res.status(400).json({ message: 'dataInicio e dataFim são obrigatórios' });
-  }
-
-  const inicio = new Date(dataInicio + 'T00:00:00');
-  const fim = new Date(dataFim + 'T23:59:59');
-
-  const rachas = await prisma.racha.findMany({
-    where: {
-      date: {
-        gte: inicio,
-        lte: fim
-      },
-      scheduled: true
-    },
-    orderBy: [{ date: 'asc' }, { hour: 'asc' }]
-  });
-
-  // Estatísticas por campo
-  const rachasPorCampo = rachas.reduce((acc, r) => {
-    acc[r.field] = (acc[r.field] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
-
-  // Estatísticas por horário
-  const rachasPorHorario = rachas.reduce((acc, r) => {
-    acc[r.hour] = (acc[r.hour] || 0) + 1;
-    return acc;
-  }, {} as Record<number, number>);
-
-  // Rachas recorrentes vs únicos
-  const recorrentes = rachas.filter(r => r.recorrente).length;
-  const unicos = rachas.filter(r => !r.recorrente).length;
-
-  res.json({
-    periodo: { dataInicio, dataFim },
-    total: rachas.length,
-    porCampo: rachasPorCampo,
-    porHorario: rachasPorHorario,
-    recorrentes,
-    unicos,
-    rachas: rachas.map(r => ({
-      id: r.id,
-      field: r.field,
-      date: r.date,
-      hour: r.hour,
-      userName: r.userName,
-      recorrente: r.recorrente
-    }))
-  });
-});
 
 /**
  * @swagger
@@ -206,14 +144,14 @@ router.get('/dashboard', async (req, res) => {
 
   const faturamentoMes = comandasMes.reduce((acc, c) => acc + c.totalCents, 0);
 
-  // Rachas do mês
-  const rachasMes = await prisma.racha.count({
+  // Reservas do mês
+  const reservasMes = await prisma.reserva.count({
     where: {
-      date: {
+      data: {
         gte: inicioMes,
         lte: fimMes
       },
-      scheduled: true
+      status: 'ATIVA'
     }
   });
 
@@ -230,33 +168,38 @@ router.get('/dashboard', async (req, res) => {
     include: { estoque: true }
   });
 
-  // Rachas de hoje
+  // Reservas de hoje
   const hojeInicio = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
   const hojeFim = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate(), 23, 59, 59);
 
-  const rachasHoje = await prisma.racha.findMany({
+  const reservasHoje = await prisma.reserva.findMany({
     where: {
-      date: {
+      data: {
         gte: hojeInicio,
         lte: hojeFim
       },
-      scheduled: true
+      status: 'ATIVA'
     },
-    orderBy: { hour: 'asc' }
+    include: {
+      cliente: { select: { nomeCompleto: true } },
+      quadra: { select: { nome: true } }
+    },
+    orderBy: { hora: 'asc' }
   });
 
   res.json({
     mes: {
       faturamentoCents: faturamentoMes,
       comandasCount: comandasMes.length,
-      rachasCount: rachasMes
+      reservasCount: reservasMes
     },
     hoje: {
-      rachas: rachasHoje.map(r => ({
+      reservas: reservasHoje.map(r => ({
         id: r.id,
-        field: r.field,
-        hour: r.hour,
-        userName: r.userName
+        quadra: r.quadra.nome,
+        hora: r.hora,
+        cliente: r.cliente.nomeCompleto,
+        precoCents: r.precoCents
       }))
     },
     alertas: {
@@ -268,6 +211,290 @@ router.get('/dashboard', async (req, res) => {
         minQuantidade: p.estoque?.minQuantidade || 0
       }))
     }
+  });
+});
+
+/**
+ * @swagger
+ * /relatorios/reservas:
+ *   get:
+ *     tags: [Relatórios]
+ *     summary: Relatório de reservas por período
+ *     parameters:
+ *       - in: query
+ *         name: dataInicio
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: date
+ *       - in: query
+ *         name: dataFim
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: date
+ *     responses:
+ *       200:
+ *         description: Relatório de reservas
+ */
+router.get('/reservas', async (req, res) => {
+  const { dataInicio, dataFim } = req.query;
+  
+  if (!dataInicio || !dataFim) {
+    return res.status(400).json({ message: 'dataInicio e dataFim são obrigatórios' });
+  }
+
+  // Converter para string e limpar espaços (pegar primeiro valor se for array)
+  const dataInicioStr = Array.isArray(dataInicio) ? String(dataInicio[0]) : String(dataInicio);
+  const dataFimStr = Array.isArray(dataFim) ? String(dataFim[0]) : String(dataFim);
+  
+  const dataInicioLimpa = dataInicioStr.trim();
+  const dataFimLimpa = dataFimStr.trim();
+
+  // Validar formato YYYY-MM-DD
+  const formatoData = /^\d{4}-\d{2}-\d{2}$/;
+  const dataInicioValida = formatoData.test(dataInicioLimpa);
+  const dataFimValida = formatoData.test(dataFimLimpa);
+  
+  if (!dataInicioValida || !dataFimValida) {
+    return res.status(400).json({ message: 'Formato de data inválido. Use YYYY-MM-DD' });
+  }
+
+  const inicio = new Date(dataInicioLimpa + 'T00:00:00');
+  const fim = new Date(dataFimLimpa + 'T23:59:59');
+
+  // Validar se as datas são válidas
+  if (isNaN(inicio.getTime()) || isNaN(fim.getTime())) {
+    return res.status(400).json({ message: 'Formato de data inválido. Use YYYY-MM-DD' });
+  }
+
+  const reservas = await prisma.reserva.findMany({
+    where: {
+      data: {
+        gte: inicio,
+        lte: fim
+      }
+    },
+    include: {
+      cliente: { select: { nomeCompleto: true, telefone: true } },
+      quadra: { select: { nome: true } }
+    },
+    orderBy: [{ data: 'asc' }, { hora: 'asc' }]
+  });
+
+  // Estatísticas por status
+  const porStatus = reservas.reduce((acc, r) => {
+    acc[r.status] = (acc[r.status] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+
+  // Estatísticas por quadra
+  const porQuadra = reservas.reduce((acc, r) => {
+    const quadra = r.quadra.nome;
+    if (!acc[quadra]) {
+      acc[quadra] = { total: 0, faturamentoCents: 0 };
+    }
+    acc[quadra].total += 1;
+    if (r.status === 'CONCLUIDA') {
+      acc[quadra].faturamentoCents += r.precoCents;
+    }
+    return acc;
+  }, {} as Record<string, { total: number; faturamentoCents: number }>);
+
+  // Estatísticas por horário
+  const porHorario = reservas.reduce((acc, r) => {
+    acc[r.hora] = (acc[r.hora] || 0) + 1;
+    return acc;
+  }, {} as Record<number, number>);
+
+  // Faturamento total (apenas reservas concluídas)
+  const faturamentoTotal = reservas
+    .filter(r => r.status === 'CONCLUIDA')
+    .reduce((acc, r) => acc + r.precoCents, 0);
+
+  // Verificar se há reservas no período
+  if (reservas.length === 0) {
+    return res.json({
+      periodo: { dataInicio: dataInicioLimpa, dataFim: dataFimLimpa },
+      message: 'Não existem reservas neste período',
+      total: 0,
+      porStatus: {},
+      porQuadra: {},
+      porHorario: {},
+      faturamentoTotal: 0,
+      reservas: []
+    });
+  }
+
+  res.json({
+    periodo: { dataInicio: dataInicioLimpa, dataFim: dataFimLimpa },
+    total: reservas.length,
+    porStatus,
+    porQuadra,
+    porHorario,
+    faturamentoTotal,
+    reservas: reservas.map(r => ({
+      id: r.id,
+      data: r.data,
+      hora: r.hora,
+      precoCents: r.precoCents,
+      status: r.status,
+      cliente: r.cliente.nomeCompleto,
+      quadra: r.quadra.nome
+    }))
+  });
+});
+
+/**
+ * @swagger
+ * /relatorios/clientes:
+ *   get:
+ *     tags: [Relatórios]
+ *     summary: Relatório de clientes
+ *     parameters:
+ *       - in: query
+ *         name: dataInicio
+ *         required: false
+ *         schema:
+ *           type: string
+ *           format: date
+ *       - in: query
+ *         name: dataFim
+ *         required: false
+ *         schema:
+ *           type: string
+ *           format: date
+ *     responses:
+ *       200:
+ *         description: Relatório de clientes
+ */
+router.get('/clientes', async (req, res) => {
+  const { dataInicio, dataFim } = req.query as { dataInicio?: string; dataFim?: string };
+
+  const where: any = {};
+  if (dataInicio && dataFim) {
+    // Converter para string e limpar espaços
+    const dataInicioStr = String(dataInicio).trim();
+    const dataFimStr = String(dataFim).trim();
+
+    // Validar formato YYYY-MM-DD
+    const formatoData = /^\d{4}-\d{2}-\d{2}$/;
+    if (!formatoData.test(dataInicioStr) || !formatoData.test(dataFimStr)) {
+      return res.status(400).json({ message: 'Formato de data inválido. Use YYYY-MM-DD' });
+    }
+
+    const inicio = new Date(dataInicioStr + 'T00:00:00');
+    const fim = new Date(dataFimStr + 'T23:59:59');
+
+    // Validar se as datas são válidas
+    if (isNaN(inicio.getTime()) || isNaN(fim.getTime())) {
+      return res.status(400).json({ message: 'Formato de data inválido. Use YYYY-MM-DD' });
+    }
+
+    where.createdAt = {
+      gte: inicio,
+      lte: fim
+    };
+  }
+
+  const clientes = await prisma.cliente.findMany({
+    where,
+    include: {
+      _count: {
+        select: {
+          comandas: true,
+          reservas: true
+        }
+      }
+    },
+    orderBy: { createdAt: 'desc' }
+  });
+
+  // Clientes mais ativos (mais comandas)
+  const clientesMaisAtivos = clientes
+    .sort((a, b) => b._count.comandas - a._count.comandas)
+    .slice(0, 10)
+    .map(c => ({
+      id: c.id,
+      nomeCompleto: c.nomeCompleto,
+      telefone: c.telefone,
+      totalComandas: c._count.comandas,
+      totalReservas: c._count.reservas
+    }));
+
+  // Clientes com mais reservas
+  const clientesMaisReservas = clientes
+    .sort((a, b) => b._count.reservas - a._count.reservas)
+    .slice(0, 10)
+    .map(c => ({
+      id: c.id,
+      nomeCompleto: c.nomeCompleto,
+      telefone: c.telefone,
+      totalComandas: c._count.comandas,
+      totalReservas: c._count.reservas
+    }));
+
+  res.json({
+    periodo: dataInicio && dataFim ? { dataInicio, dataFim } : null,
+    total: clientes.length,
+    clientesMaisAtivos,
+    clientesMaisReservas,
+    estatisticas: {
+      totalComandas: clientes.reduce((acc, c) => acc + c._count.comandas, 0),
+      totalReservas: clientes.reduce((acc, c) => acc + c._count.reservas, 0)
+    }
+  });
+});
+
+/**
+ * @swagger
+ * /relatorios/estoque:
+ *   get:
+ *     tags: [Relatórios]
+ *     summary: Relatório de estoque
+ *     responses:
+ *       200:
+ *         description: Relatório de estoque
+ */
+router.get('/estoque', async (req, res) => {
+  const produtos = await prisma.produto.findMany({
+    where: { active: true },
+    include: { estoque: true },
+    orderBy: { name: 'asc' }
+  });
+
+  const estoqueBaixo = produtos.filter(p => 
+    p.estoque && p.estoque.quantidade <= p.estoque.minQuantidade
+  );
+
+  const semEstoque = produtos.filter(p => 
+    p.estoque && p.estoque.quantidade === 0
+  );
+
+  const valorTotalEstoque = produtos.reduce((acc, p) => {
+    if (p.estoque) {
+      return acc + (p.estoque.quantidade * p.priceCents);
+    }
+    return acc;
+  }, 0);
+
+  res.json({
+    totalProdutos: produtos.length,
+    estoqueBaixo: estoqueBaixo.length,
+    semEstoque: semEstoque.length,
+    valorTotalEstoque,
+    produtos: produtos.map(p => ({
+      id: p.id,
+      name: p.name,
+      category: p.category,
+      priceCents: p.priceCents,
+      quantidade: p.estoque?.quantidade || 0,
+      minQuantidade: p.estoque?.minQuantidade || 0,
+      status: p.estoque ? 
+        (p.estoque.quantidade === 0 ? 'SEM_ESTOQUE' : 
+         p.estoque.quantidade <= p.estoque.minQuantidade ? 'ESTOQUE_BAIXO' : 'NORMAL') : 
+        'SEM_CONTROLE'
+    }))
   });
 });
 

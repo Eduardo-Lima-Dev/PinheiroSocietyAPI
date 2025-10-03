@@ -5,11 +5,13 @@ import helmet from 'helmet';
 import swaggerUi from 'swagger-ui-express';
 import { swaggerSpec } from './config/swagger.js';
 import usersRouter from './routes/users.js';
-import rachasRouter from './routes/rachas.js';
 import comandasRouter from './routes/comandas.js';
 import authRouter from './routes/auth.js';
 import produtosRouter from './routes/produtos.js';
 import relatoriosRouter from './routes/relatorios.js';
+import clientesRouter from './routes/clientes.js';
+import quadrasRouter from './routes/quadras.js';
+import reservasRouter from './routes/reservas.js';
 
 const app = express();
 app.use(helmet());
@@ -24,11 +26,13 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
 
 // Rotas principais
 app.use('/users', usersRouter);
-app.use('/rachas', rachasRouter);
 app.use('/comandas', comandasRouter);
 app.use('/auth', authRouter);
 app.use('/produtos', produtosRouter);
 app.use('/relatorios', relatoriosRouter);
+app.use('/clientes', clientesRouter);
+app.use('/quadras', quadrasRouter);
+app.use('/reservas', reservasRouter);
 
 /**
  * @swagger

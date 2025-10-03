@@ -16,7 +16,27 @@ model User {
   role      UserRole  @default(USER)
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
-  comandas  Comanda[]
+}
+
+model Cliente {
+  id          Int       @id @default(autoincrement())
+  nomeCompleto String
+  cpf         String    @unique
+  email       String    @unique
+  telefone    String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  comandas    Comanda[]
+  reservas    Reserva[]
+}
+
+model Quadra {
+  id          Int       @id @default(autoincrement())
+  nome        String    @unique
+  ativa       Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  reservas    Reserva[]
 }
 
 model Produto {
@@ -41,32 +61,33 @@ model Estoque {
   produto       Produto  @relation(fields: [produtoId], references: [id])
 }
 
-model Racha {
-  id         Int      @id @default(autoincrement())
-  field      String
-  date       DateTime
-  hour       Int
-  scheduled  Boolean  @default(false)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-  userName   String?
-  ativo      Boolean  @default(true)
-  diaSemana  Int?
-  recorrente Boolean  @default(false)
+model Reserva {
+  id          Int       @id @default(autoincrement())
+  clienteId   Int
+  quadraId    Int
+  data        DateTime
+  hora        Int
+  precoCents  Int
+  status      ReservaStatus @default(ATIVA)
+  observacoes String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  cliente     Cliente   @relation(fields: [clienteId], references: [id])
+  quadra      Quadra    @relation(fields: [quadraId], references: [id])
 
-  @@unique([date, hour, field])
+  @@unique([data, hora, quadraId])
 }
+
 
 model Comanda {
   id           Int            @id @default(autoincrement())
-  userId       Int?
+  clienteId    Int?
   openedAt     DateTime       @default(now())
   closedAt     DateTime?
   totalCents   Int            @default(0)
   payment      PaymentMethod?
   notes        String?
-  customerName String?
-  user         User?          @relation(fields: [userId], references: [id])
+  cliente      Cliente?       @relation(fields: [clienteId], references: [id])
   items        ComandaItem[]
 }
 
@@ -98,4 +119,10 @@ enum ProductCategory {
   COMIDA
   SNACK
   OUTROS
+}
+
+enum ReservaStatus {
+  ATIVA
+  CANCELADA
+  CONCLUIDA
 }

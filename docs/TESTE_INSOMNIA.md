@@ -30,21 +30,29 @@ npm run dev
 - ✅ **POST /users** (Criar Admin) - Cria um administrador
 - ✅ **GET /users** - Lista todos os usuários
 
-#### **Produtos e Estoque**
-1. ✅ **POST /produtos** - Criar produto com estoque
-2. ✅ **GET /produtos** - Listar produtos
-3. ✅ **GET /produtos/estoque-baixo** - Ver produtos com estoque baixo
-4. ✅ **PUT /produtos/1/estoque** - Atualizar estoque
+#### **Clientes**
+1. ✅ **POST /clientes** - Criar cliente
+2. ✅ **GET /clientes** - Listar clientes
+3. ✅ **GET /clientes/buscar?q=Maria** - Buscar cliente
+4. ✅ **PUT /clientes/1** - Atualizar cliente
+5. ✅ **DELETE /clientes/1** - Excluir cliente
 
-#### **Rachas**
-1. ✅ **GET /rachas/slots** - Ver horários disponíveis
-2. ✅ **POST /rachas** - Agendar racha normal
-3. ✅ **POST /rachas** (Recorrente) - Agendar racha recorrente
-4. ✅ **GET /rachas** - Listar rachas
-5. ✅ **POST /rachas/1/desativar** - Desativar rachas recorrentes
+#### **Quadras**
+1. ✅ **POST /quadras** - Criar quadra
+2. ✅ **GET /quadras** - Listar quadras
+3. ✅ **GET /quadras/1/disponibilidade?data=2025-01-27** - Verificar disponibilidade
+4. ✅ **PUT /quadras/1** - Atualizar quadra
+5. ✅ **DELETE /quadras/1** - Excluir quadra
+
+#### **Reservas**
+1. ✅ **POST /reservas** - Criar reserva
+2. ✅ **GET /reservas** - Listar reservas
+3. ✅ **PUT /reservas/1/reagendar** - Reagendar reserva
+4. ✅ **PUT /reservas/1/cancelar** - Cancelar reserva
+5. ✅ **PUT /reservas/1/concluir** - Concluir reserva
 
 #### **Comandas**
-1. ✅ **POST /comandas** - Abrir comanda
+1. ✅ **POST /comandas** - Abrir comanda para cliente
 2. ✅ **GET /comandas/1** - Ver detalhes da comanda
 3. ✅ **POST /comandas/1/itens** (Produto) - Adicionar produto do estoque
 4. ✅ **POST /comandas/1/itens** (Customizado) - Adicionar item customizado
@@ -53,24 +61,34 @@ npm run dev
 #### **Relatórios**
 1. ✅ **GET /relatorios/dashboard** - Dashboard geral
 2. ✅ **GET /relatorios/faturamento** - Relatório de faturamento
-3. ✅ **GET /relatorios/rachas** - Relatório de rachas
+3. ✅ **GET /relatorios/reservas** - Relatório de reservas
+4. ✅ **GET /relatorios/clientes** - Relatório de clientes
+5. ✅ **GET /relatorios/estoque** - Relatório de estoque
 
 ## 📋 Dados de exemplo incluídos
 
 ### **Usuários**
 - **Admin**: admin@pinheirosociety.com / admin123
 
-### **Produtos**
-- **Cerveja Skol 350ml**: R$ 5,00 (BEBIDA)
-- **Hambúrguer Artesanal**: R$ 15,00 (COMIDA)
+### **Clientes**
+- **Nome**: Maria Santos
+- **CPF**: 12345678901
+- **Email**: maria@email.com
+- **Telefone**: (11) 99999-9999
 
-### **Rachas**
-- **Data**: 2025-01-25
-- **Campo**: Quadra 1
-- **Horário**: 18h (válido: 18-23h)
-- **Recorrente**: Cria 12 semanas automaticamente
+### **Quadras**
+- **Nome**: Quadra 1
+- **Status**: Ativa
+
+### **Reservas**
+- **Data**: 2025-01-27
+- **Hora**: 14h (preço: R$ 100,00 - horário diurno)
+- **Hora**: 19h (preço: R$ 110,00 - horário noturno)
+- **Cliente**: Obrigatório
+- **Status**: ATIVA, CANCELADA, CONCLUIDA
 
 ### **Comandas**
+- **Cliente**: Associado a cliente cadastrado
 - **Produto do estoque**: Usa produtoId
 - **Item customizado**: Usa description + unitCents
 - **Pagamento**: PIX (opções: CASH, PIX, CARD)
@@ -78,27 +96,30 @@ npm run dev
 ## 🔧 Dicas importantes
 
 ### **IDs dinâmicos**
-- Após criar usuários, use o ID retornado nas comandas
+- Após criar clientes, use o ID retornado nas reservas e comandas
+- Após criar quadras, use o ID retornado nas reservas
 - Após criar produtos, use o ID retornado nos itens da comanda
 - Após criar comandas, use o ID retornado nos endpoints de itens
 
 ### **Horários válidos**
-- Rachas só podem ser agendados entre 18h e 23h
-- Use o endpoint `/rachas/slots` para ver disponibilidade
+- Reservas podem ser agendadas entre 8h e 23h
+- Use o endpoint `/quadras/{id}/disponibilidade` para ver disponibilidade
+- Preços dinâmicos: R$ 100,00 (até 17h) / R$ 110,00 (após 17h)
 
 ### **Valores monetários**
 - Todos os preços são em **centavos**
 - Exemplo: R$ 5,00 = 500 centavos
+- Reservas: R$ 100,00 = 10000 centavos / R$ 110,00 = 11000 centavos
 
 ### **Estoque**
 - Produtos são criados com estoque automaticamente
 - Comandas verificam estoque antes de adicionar itens
-- Use `/produtos/estoque-baixo` para alertas
+- Use `/relatorios/estoque` para alertas
 
-### **Rachas Recorrentes**
-- Marcando `recorrente: true` cria 12 semanas
-- Use `/rachas/:id/desativar` para parar recorrência
-- Rachas recorrentes têm `diaSemana` (0=domingo, 6=sábado)
+### **Reservas**
+- Cliente é obrigatório para todas as reservas
+- Reagendamento mantém histórico e recalcula preços
+- Status: ATIVA (padrão), CANCELADA, CONCLUIDA
 
 ### **Códigos de resposta**
 - **200**: Sucesso
@@ -135,26 +156,34 @@ npm run dev
 - **Health Check**: http://localhost:3000/health
 - **Produção**: https://pinheiro-society-api.vercel.app/api-docs
 
-## 🆕 Novidades da v2
+## 🆕 Novidades da v3
 
-### **Sistema de Estoque**
-- ✅ Produtos com categorias
-- ✅ Controle de quantidade
-- ✅ Alertas de estoque baixo
-- ✅ Integração com comandas
+### **Sistema de Clientes**
+- ✅ Cadastro completo (nome, CPF, email, telefone)
+- ✅ CRUD completo com validações
+- ✅ Busca por nome, CPF ou email
+- ✅ Associação com comandas e reservas
 
-### **Rachas Recorrentes**
-- ✅ Agendamento semanal automático
-- ✅ Desativação de recorrência
-- ✅ Controle por dia da semana
+### **Sistema de Quadras**
+- ✅ Cadastro e gerenciamento de quadras
+- ✅ Controle de disponibilidade por data/hora
+- ✅ Verificação de conflitos de agendamento
 
-### **Relatórios**
-- ✅ Faturamento por período
-- ✅ Produtos mais vendidos
-- ✅ Estatísticas de rachas
-- ✅ Dashboard geral
+### **Sistema de Reservas**
+- ✅ Agendamento profissional de quadras
+- ✅ Preços dinâmicos (R$ 100 até 17h / R$ 110 após 17h)
+- ✅ Horários amplos (8h às 23h)
+- ✅ Reagendamento com validações
+- ✅ Status detalhado (ATIVA, CANCELADA, CONCLUIDA)
 
-### **Comandas Melhoradas**
+### **Relatórios Expandidos**
+- ✅ Relatórios de reservas por período
+- ✅ Análise de clientes mais ativos
+- ✅ Controle de estoque detalhado
+- ✅ Dashboard com dados de reservas
+
+### **Comandas Atualizadas**
+- ✅ Associação com clientes cadastrados
 - ✅ Produtos do estoque
 - ✅ Itens customizados
 - ✅ Verificação de estoque

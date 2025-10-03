@@ -23,20 +23,32 @@ const router = Router();
  *           schema:
  *             type: object
  *             properties:
- *               userId:
+ *               clienteId:
  *                 type: integer
+ *                 description: ID do cliente (opcional)
  *               notes:
  *                 type: string
- *               customerName:
- *                 type: string
- *                 description: Nome do cliente (opcional)
  *     responses:
  *       201:
  *         description: Comanda aberta
  */
 router.post('/', async (req, res) => {
-  const { userId, notes, customerName } = req.body as { userId?: number; notes?: string; customerName?: string };
-  const comanda = await prisma.comanda.create({ data: { userId: userId ?? null, notes: notes ?? null, customerName: customerName ?? null } });
+  const { clienteId, notes } = req.body as { clienteId?: number; notes?: string };
+  
+  // Se clienteId foi informado, verificar se cliente existe
+  if (clienteId) {
+    const cliente = await prisma.cliente.findUnique({ where: { id: clienteId } });
+    if (!cliente) {
+      return res.status(400).json({ message: 'Cliente não encontrado' });
+    }
+  }
+  
+  const comanda = await prisma.comanda.create({ 
+    data: { 
+      clienteId: clienteId ?? null, 
+      notes: notes ?? null 
+    } 
+  });
   res.status(201).json(comanda);
 });
 
@@ -60,7 +72,19 @@ router.post('/', async (req, res) => {
  */
 router.get('/:id', async (req, res) => {
   const id = Number(req.params.id);
-  const comanda = await prisma.comanda.findUnique({ where: { id }, include: { items: true, user: { select: { id: true, name: true } } } });
+  const comanda = await prisma.comanda.findUnique({ 
+    where: { id }, 
+    include: { 
+      items: true, 
+      cliente: { 
+        select: { 
+          id: true, 
+          nomeCompleto: true, 
+          telefone: true 
+        } 
+      } 
+    } 
+  });
   if (!comanda) return res.status(404).json({ message: 'Comanda não encontrada' });
   res.json(comanda);
 });

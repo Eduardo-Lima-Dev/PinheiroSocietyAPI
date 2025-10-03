@@ -1,6 +1,6 @@
 # 🏆 PinheiroSocietyAPI
 
-API completa para gestão da Pinheiro Society - sistema de rachas, comandas e usuários.
+API completa para gestão da Pinheiro Society - sistema de reservas, comandas, clientes e usuários.
 
 ## 🚀 Funcionalidades
 
@@ -9,17 +9,38 @@ API completa para gestão da Pinheiro Society - sistema de rachas, comandas e us
 - Login de administradores com JWT
 - Senhas criptografadas com bcrypt
 
-### ⚽ **Sistema de Rachas**
-- Agendamento de rachas por data, campo e horário
-- Horários disponíveis: 18h às 23h
-- Nome opcional do usuário que agendou
-- Verificação de disponibilidade de slots
+### 👤 **Gestão de Clientes**
+- Cadastro completo de clientes (nome, CPF, email, telefone)
+- CRUD completo com validações
+- Busca por nome, CPF ou email
+- Associação com comandas e reservas
+
+### 🏟️ **Gestão de Quadras**
+- Cadastro e gerenciamento de quadras
+- Controle de disponibilidade por data/hora
+- Verificação de conflitos de agendamento
+
+### 🎯 **Sistema de Reservas**
+- Agendamento profissional de quadras
+- **Preços dinâmicos**: R$ 100,00 (até 17h) / R$ 110,00 (após 17h)
+- Horários amplos: 8h às 23h
+- Reagendamento com validações
+- Status: ATIVA, CANCELADA, CONCLUIDA
+- Cliente obrigatório para todas as reservas
 
 ### 🧾 **Sistema de Comandas**
-- Abertura de comandas com usuário ou nome opcional
+- Abertura de comandas associadas a clientes
 - Adição de itens com preços em centavos
 - Cálculo automático do total
 - Fechamento com forma de pagamento (CASH/PIX/CARD)
+- Controle de estoque integrado
+
+### 📊 **Relatórios Administrativos**
+- Relatórios financeiros por período
+- Análise de reservas e ocupação
+- Relatórios de clientes mais ativos
+- Controle de estoque e alertas
+- Dashboard com resumo geral
 
 ## 🛠️ Tecnologias
 
@@ -87,12 +108,15 @@ Importe o arquivo `insomnia_collection.json` no Insomnia para testar todos os en
 1. Health Check
 2. Criar usuário admin
 3. Login de admin
-4. Criar usuário comum
-5. Ver horários disponíveis
-6. Agendar racha
-7. Abrir comanda
-8. Adicionar itens
-9. Fechar comanda
+4. Criar cliente
+5. Criar quadra
+6. Ver disponibilidade da quadra
+7. Criar reserva
+8. Reagendar reserva
+9. Abrir comanda para cliente
+10. Adicionar itens
+11. Fechar comanda
+12. Gerar relatórios
 
 ## 🗂️ Estrutura do Projeto
 
@@ -107,8 +131,12 @@ src/
 ├── routes/
 │   ├── auth.ts             # Autenticação (login)
 │   ├── users.ts            # Gestão de usuários
-│   ├── rachas.ts           # Gestão de rachas
-│   └── comandas.ts         # Gestão de comandas
+│   ├── clientes.ts         # Gestão de clientes
+│   ├── quadras.ts          # Gestão de quadras
+│   ├── reservas.ts         # Gestão de reservas
+│   ├── comandas.ts         # Gestão de comandas
+│   ├── produtos.ts         # Gestão de produtos
+│   └── relatorios.ts       # Relatórios administrativos
 └── index.ts                # Servidor principal
 
 prisma/
@@ -132,14 +160,26 @@ npm run prisma:studio    # Abre Prisma Studio
 ### **User**
 - `id`, `name`, `email`, `password`, `role` (ADMIN/USER)
 
-### **Racha**
-- `id`, `field`, `date`, `hour` (18-23), `scheduled`, `userName?`
+### **Cliente**
+- `id`, `nomeCompleto`, `cpf`, `email`, `telefone`, `createdAt`, `updatedAt`
+
+### **Quadra**
+- `id`, `nome`, `ativa`, `createdAt`, `updatedAt`
+
+### **Reserva**
+- `id`, `clienteId`, `quadraId`, `data`, `hora`, `precoCents`, `status` (ATIVA/CANCELADA/CONCLUIDA), `observacoes?`
 
 ### **Comanda**
-- `id`, `userId?`, `customerName?`, `openedAt`, `closedAt?`, `totalCents`, `payment?`, `notes?`
+- `id`, `clienteId?`, `openedAt`, `closedAt?`, `totalCents`, `payment?`, `notes?`
 
 ### **ComandaItem**
-- `id`, `comandaId`, `description`, `quantity`, `unitCents`
+- `id`, `comandaId`, `description`, `quantity`, `unitCents`, `produtoId?`
+
+### **Produto**
+- `id`, `name`, `description?`, `category`, `priceCents`, `active`
+
+### **Estoque**
+- `id`, `produtoId`, `quantidade`, `minQuantidade`
 
 ## 🔐 Autenticação
 
@@ -166,11 +206,15 @@ Todos os valores são armazenados em **centavos** para evitar problemas de ponto
 - R$ 5,00 = 500 centavos
 - R$ 10,50 = 1050 centavos
 
-## 🕐 Horários de Rachas
+## 🕐 Sistema de Reservas
 
-- **Horários válidos**: 18h, 19h, 20h, 21h, 22h, 23h
+- **Horários válidos**: 8h às 23h (horário comercial completo)
+- **Preços dinâmicos**: 
+  - R$ 100,00 até 17h (horário diurno)
+  - R$ 110,00 das 17h às 23h (horário noturno)
 - **Formato de data**: YYYY-MM-DD
-- **Verificação**: Use `/rachas/slots` para ver disponibilidade
+- **Verificação**: Use `/quadras/{id}/disponibilidade` para ver disponibilidade
+- **Reagendamento**: Use `/reservas/{id}/reagendar` para alterar data/hora
 
 
 ---
