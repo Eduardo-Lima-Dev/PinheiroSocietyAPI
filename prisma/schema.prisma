@@ -62,18 +62,24 @@ model Estoque {
 }
 
 model Reserva {
-  id          Int       @id @default(autoincrement())
-  clienteId   Int
-  quadraId    Int
-  data        DateTime
-  hora        Int
-  precoCents  Int
-  status      ReservaStatus @default(ATIVA)
-  observacoes String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  cliente     Cliente   @relation(fields: [clienteId], references: [id])
-  quadra      Quadra    @relation(fields: [quadraId], references: [id])
+  id                   Int       @id @default(autoincrement())
+  clienteId            Int
+  quadraId             Int
+  data                 DateTime
+  hora                 Int
+  precoCents           Int
+  status               ReservaStatus @default(ATIVA)
+  observacoes          String?
+  recorrente           Boolean   @default(false)
+  diaSemana            Int?      // 0=domingo, 1=segunda, ..., 6=sábado
+  dataFimRecorrencia   DateTime? // Data limite para a recorrência
+  reservaPaiId         Int?      // ID da reserva original que gerou esta recorrência
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  cliente              Cliente   @relation(fields: [clienteId], references: [id])
+  quadra               Quadra    @relation(fields: [quadraId], references: [id])
+  reservaPai           Reserva?  @relation("ReservaRecorrencia", fields: [reservaPaiId], references: [id])
+  reservasFilhas       Reserva[] @relation("ReservaRecorrencia")
 
   @@unique([data, hora, quadraId])
 }

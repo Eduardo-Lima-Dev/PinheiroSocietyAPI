@@ -49,6 +49,44 @@ const swaggerDefinition: SwaggerDefinition = {
           updatedAt: { type: 'string', format: 'date-time' }
         }
       },
+      Reserva: {
+        type: 'object',
+        properties: {
+          id: { type: 'integer', example: 1 },
+          clienteId: { type: 'integer', example: 1 },
+          quadraId: { type: 'integer', example: 1 },
+          data: { type: 'string', format: 'date-time', example: '2025-01-25T00:00:00.000Z' },
+          hora: { type: 'integer', minimum: 8, maximum: 23, example: 14 },
+          precoCents: { type: 'integer', example: 10000 },
+          status: { type: 'string', enum: ['ATIVA', 'CANCELADA', 'CONCLUIDA'], example: 'ATIVA' },
+          observacoes: { type: 'string', nullable: true, example: 'Reserva para torneio' },
+          recorrente: { type: 'boolean', example: false },
+          diaSemana: { type: 'integer', nullable: true, minimum: 0, maximum: 6, example: 1 },
+          dataFimRecorrencia: { type: 'string', format: 'date-time', nullable: true },
+          reservaPaiId: { type: 'integer', nullable: true, example: null },
+          createdAt: { type: 'string', format: 'date-time' },
+          updatedAt: { type: 'string', format: 'date-time' },
+          cliente: { $ref: '#/components/schemas/Cliente' },
+          quadra: { $ref: '#/components/schemas/Quadra' },
+          reservaPai: { $ref: '#/components/schemas/Reserva', nullable: true },
+          reservasFilhas: { type: 'array', items: { $ref: '#/components/schemas/Reserva' } }
+        }
+      },
+      Cliente: {
+        type: 'object',
+        properties: {
+          id: { type: 'integer', example: 1 },
+          nomeCompleto: { type: 'string', example: 'João Silva' },
+          telefone: { type: 'string', example: '(11) 99999-9999' }
+        }
+      },
+      Quadra: {
+        type: 'object',
+        properties: {
+          id: { type: 'integer', example: 1 },
+          nome: { type: 'string', example: 'Quadra 1' }
+        }
+      },
       Produto: {
         type: 'object',
         properties: {

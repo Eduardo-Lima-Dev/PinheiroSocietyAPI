@@ -35,12 +35,24 @@ const router = Router();
  *         schema:
  *           type: string
  *           format: date
+ *       - in: query
+ *         name: recorrente
+ *         required: false
+ *         schema:
+ *           type: boolean
+ *         description: Filtrar por reservas recorrentes
+ *       - in: query
+ *         name: apenasPais
+ *         required: false
+ *         schema:
+ *           type: boolean
+ *         description: Retornar apenas reservas pai (sem reservas filhas de recorrência)
  *     responses:
  *       200:
  *         description: Lista de reservas
  */
 router.get('/', async (req, res) => {
-  const { status, dataInicio, dataFim } = req.query;
+  const { status, dataInicio, dataFim, recorrente, apenasPais } = req.query;
 
   const where: any = {};
 
@@ -87,6 +99,16 @@ router.get('/', async (req, res) => {
     }
   }
 
+  // Filtros para recorrência
+  if (recorrente !== undefined) {
+    const recorrenteBool = recorrente === 'true';
+    where.recorrente = recorrenteBool;
+  }
+
+  if (apenasPais === 'true') {
+    where.reservaPaiId = null;
+  }
+
   const reservas = await prisma.reserva.findMany({
     where,
     include: {
@@ -95,6 +117,12 @@ router.get('/', async (req, res) => {
       },
       quadra: {
         select: { id: true, nome: true }
+      },
+      reservaPai: {
+        select: { id: true, data: true, hora: true }
+      },
+      reservasFilhas: {
+        select: { id: true, data: true, hora: true, status: true }
       }
     },
     orderBy: [{ data: 'asc' }, { hora: 'asc' }]
@@ -165,26 +193,52 @@ router.get('/:id', async (req, res) => {
  *                 maximum: 23
  *               observacoes:
  *                 type: string
+ *               recorrente:
+ *                 type: boolean
+ *                 default: false
+ *                 description: Se true, cria reservas recorrentes
+ *               diaSemana:
+ *                 type: integer
+ *                 minimum: 0
+ *                 maximum: 6
+ *                 description: Dia da semana para recorrência (0=domingo, 1=segunda, ..., 6=sábado)
+ *               dataFimRecorrencia:
+ *                 type: string
+ *                 format: date
+ *                 description: Data limite para a recorrência (máximo 6 meses)
  *     responses:
  *       201:
- *         description: Reserva criada
+ *         description: Reserva(s) criada(s)
  *       400:
  *         description: Dados inválidos
  *       409:
  *         description: Conflito de horário
  */
 router.post('/', async (req, res) => {
-  const { clienteId, quadraId, data, hora, observacoes } = req.body as {
+  const { clienteId, quadraId, data, hora, observacoes, recorrente, diaSemana, dataFimRecorrencia } = req.body as {
     clienteId: number;
     quadraId: number;
     data: string;
     hora: number;
     observacoes?: string;
+    recorrente?: boolean;
+    diaSemana?: number;
+    dataFimRecorrencia?: string;
   };
 
   // Validações
   if (hora < 8 || hora > 23) {
     return res.status(400).json({ message: 'Hora deve estar entre 8 e 23' });
+  }
+
+  // Validações para recorrência
+  if (recorrente) {
+    if (diaSemana === undefined || diaSemana < 0 || diaSemana > 6) {
+      return res.status(400).json({ message: 'diaSemana é obrigatório para reservas recorrentes (0=domingo, 1=segunda, ..., 6=sábado)' });
+    }
+    if (!dataFimRecorrencia) {
+      return res.status(400).json({ message: 'dataFimRecorrencia é obrigatória para reservas recorrentes' });
+    }
   }
 
   const dataReserva = new Date(data + 'T00:00:00');
@@ -193,6 +247,21 @@ router.post('/', async (req, res) => {
 
   if (dataReserva < hoje) {
     return res.status(400).json({ message: 'Não é possível agendar para datas passadas' });
+  }
+
+  // Validar data fim de recorrência (máximo 6 meses)
+  if (recorrente && dataFimRecorrencia) {
+    const dataFim = new Date(dataFimRecorrencia + 'T23:59:59');
+    const dataMaxima = new Date(dataReserva);
+    dataMaxima.setMonth(dataMaxima.getMonth() + 6);
+
+    if (dataFim > dataMaxima) {
+      return res.status(400).json({ message: 'A data fim da recorrência não pode ser superior a 6 meses da data inicial' });
+    }
+
+    if (dataFim <= dataReserva) {
+      return res.status(400).json({ message: 'A data fim da recorrência deve ser posterior à data inicial' });
+    }
   }
 
   // Verificar se cliente e quadra existem
@@ -209,43 +278,140 @@ router.post('/', async (req, res) => {
     return res.status(400).json({ message: 'Quadra não encontrada ou inativa' });
   }
 
-  // Verificar conflito de horário
-  const conflito = await prisma.reserva.findFirst({
-    where: {
-      quadraId,
-      data: dataReserva,
-      hora,
-      status: 'ATIVA'
-    }
-  });
-
-  if (conflito) {
-    return res.status(409).json({ message: 'Horário já está ocupado' });
-  }
-
   // Calcular preço baseado no horário
   const precoCents = hora < 17 ? 10000 : 11000; // 100 reais até 17h, 110 reais após
 
-  const reserva = await prisma.reserva.create({
-    data: {
-      clienteId,
-      quadraId,
-      data: dataReserva,
-      hora,
-      precoCents,
-      observacoes: observacoes || null
-    },
-    include: {
-      cliente: {
-        select: { id: true, nomeCompleto: true, telefone: true }
-      },
-      quadra: {
-        select: { id: true, nome: true }
-      }
+  // Função para gerar datas de recorrência
+  const gerarDatasRecorrencia = (dataInicio: Date, diaSemana: number, dataFim: Date): Date[] => {
+    const datas: Date[] = [];
+    const dataAtual = new Date(dataInicio);
+    
+    // Encontrar o primeiro dia da semana correspondente
+    while (dataAtual.getDay() !== diaSemana && dataAtual <= dataFim) {
+      dataAtual.setDate(dataAtual.getDate() + 1);
     }
-  });
+    
+    // Adicionar todas as datas da recorrência
+    while (dataAtual <= dataFim) {
+      datas.push(new Date(dataAtual));
+      dataAtual.setDate(dataAtual.getDate() + 7); // Próxima semana
+    }
+    
+    return datas;
+  };
 
-  res.status(201).json(reserva);
+  if (recorrente && diaSemana !== undefined && dataFimRecorrencia) {
+    // Criar reservas recorrentes
+    const dataFim = new Date(dataFimRecorrencia + 'T23:59:59');
+    const datasRecorrencia = gerarDatasRecorrencia(dataReserva, diaSemana, dataFim);
+    
+    if (datasRecorrencia.length === 0) {
+      return res.status(400).json({ message: 'Nenhuma data de recorrência encontrada para o período especificado' });
+    }
+
+    // Verificar conflitos para todas as datas
+    const conflitos = await prisma.reserva.findMany({
+      where: {
+        quadraId,
+        data: { in: datasRecorrencia },
+        hora,
+        status: 'ATIVA'
+      },
+      select: { data: true }
+    });
+
+    if (conflitos.length > 0) {
+      const datasConflito = conflitos.map(c => c.data.toISOString().split('T')[0]);
+      return res.status(409).json({ 
+        message: `Conflito de horário nas seguintes datas: ${datasConflito.join(', ')}` 
+      });
+    }
+
+    // Criar reserva pai (primeira reserva)
+    const reservaPai = await prisma.reserva.create({
+      data: {
+        clienteId,
+        quadraId,
+        data: dataReserva,
+        hora,
+        precoCents,
+        observacoes: observacoes || null,
+        recorrente: true,
+        diaSemana,
+        dataFimRecorrencia: dataFim
+      },
+      include: {
+        cliente: {
+          select: { id: true, nomeCompleto: true, telefone: true }
+        },
+        quadra: {
+          select: { id: true, nome: true }
+        }
+      }
+    });
+
+    // Criar reservas filhas (demais datas)
+    const reservasFilhas = await Promise.all(
+      datasRecorrencia.slice(1).map(data => 
+        prisma.reserva.create({
+          data: {
+            clienteId,
+            quadraId,
+            data,
+            hora,
+            precoCents,
+            observacoes: observacoes || null,
+            recorrente: false,
+            reservaPaiId: reservaPai.id
+          }
+        })
+      )
+    );
+
+    res.status(201).json({
+      reservaPai,
+      reservasCriadas: reservasFilhas.length + 1,
+      totalReservas: reservasFilhas.length + 1,
+      message: `Reserva recorrente criada com sucesso. ${reservasFilhas.length + 1} reservas criadas.`
+    });
+
+  } else {
+    // Criar reserva única (lógica original)
+    const conflito = await prisma.reserva.findFirst({
+      where: {
+        quadraId,
+        data: dataReserva,
+        hora,
+        status: 'ATIVA'
+      }
+    });
+
+    if (conflito) {
+      return res.status(409).json({ message: 'Horário já está ocupado' });
+    }
+
+    const reserva = await prisma.reserva.create({
+      data: {
+        clienteId,
+        quadraId,
+        data: dataReserva,
+        hora,
+        precoCents,
+        observacoes: observacoes || null,
+        recorrente: false
+      },
+      include: {
+        cliente: {
+          select: { id: true, nomeCompleto: true, telefone: true }
+        },
+        quadra: {
+          select: { id: true, nome: true }
+        }
+      }
+    });
+
+    res.status(201).json(reserva);
+  }
 });
 
 /**
@@ -455,6 +621,72 @@ router.put('/:id/concluir', async (req, res) => {
   });
 
   res.json(reservaConcluida);
+});
+
+/**
+ * @swagger
+ * /reservas/{id}/cancelar-recorencia:
+ *   put:
+ *     tags: [Reservas]
+ *     summary: Cancela todas as reservas de uma recorrência
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID da reserva pai da recorrência
+ *     responses:
+ *       200:
+ *         description: Recorrência cancelada com sucesso
+ *       404:
+ *         description: Reserva não encontrada
+ *       400:
+ *         description: Reserva não é uma recorrência
+ */
+router.put('/:id/cancelar-recorencia', async (req, res) => {
+  const id = Number(req.params.id);
+
+  // Verificar se a reserva existe e é uma recorrência
+  const reservaPai = await prisma.reserva.findUnique({
+    where: { id },
+    include: {
+      reservasFilhas: true
+    }
+  });
+
+  if (!reservaPai) {
+    return res.status(404).json({ message: 'Reserva não encontrada' });
+  }
+
+  if (!reservaPai.recorrente) {
+    return res.status(400).json({ message: 'Esta reserva não é uma recorrência' });
+  }
+
+  // Cancelar reserva pai
+  await prisma.reserva.update({
+    where: { id },
+    data: { status: 'CANCELADA' }
+  });
+
+  // Cancelar todas as reservas filhas ativas
+  const reservasFilhasIds = reservaPai.reservasFilhas
+    .filter(filha => filha.status === 'ATIVA')
+    .map(filha => filha.id);
+
+  if (reservasFilhasIds.length > 0) {
+    await prisma.reserva.updateMany({
+      where: {
+        id: { in: reservasFilhasIds }
+      },
+      data: { status: 'CANCELADA' }
+    });
+  }
+
+  res.json({
+    message: `Recorrência cancelada com sucesso. ${reservasFilhasIds.length + 1} reservas canceladas.`,
+    reservasCanceladas: reservasFilhasIds.length + 1
+  });
 });
 
 export default router;
