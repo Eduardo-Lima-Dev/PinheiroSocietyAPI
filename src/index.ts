@@ -12,6 +12,8 @@ import relatoriosRouter from './routes/relatorios.js';
 import clientesRouter from './routes/clientes.js';
 import quadrasRouter from './routes/quadras.js';
 import reservasRouter from './routes/reservas.js';
+import adminRouter from './routes/admin.js';
+import reservasJob from './jobs/reservas-job.js';
 
 const app = express();
 app.use(helmet());
@@ -33,6 +35,7 @@ app.use('/relatorios', relatoriosRouter);
 app.use('/clientes', clientesRouter);
 app.use('/quadras', quadrasRouter);
 app.use('/reservas', reservasRouter);
+app.use('/admin', adminRouter);
 
 /**
  * @swagger
@@ -53,8 +56,12 @@ app.get('/health', (_req, res) => {
   res.json({ status: 'ok', name: 'PinheiroSocietyAPI' });
 });
 
+// Iniciar job automático de reservas
+reservasJob.start();
+
 const port = Number(process.env.PORT) || 3000;
 app.listen(port, () => {
   console.log('🚀 Servidor rodando em http://localhost:' + port);
   console.log('📚 Documentação Swagger disponível em http://localhost:' + port + '/api-docs');
+  console.log('📅 Job automático de reservas iniciado (execução diária às 02:00)');
 });

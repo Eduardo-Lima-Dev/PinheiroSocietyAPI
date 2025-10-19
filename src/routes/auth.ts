@@ -17,7 +17,7 @@ const router = Router();
  * /auth/login:
  *   post:
  *     tags: [Auth]
- *     summary: Login de administrador
+ *     summary: Login de usuário (ADMIN ou USER)
  *     requestBody:
  *       required: true
  *       content:
@@ -34,12 +34,13 @@ const router = Router();
  *       200:
  *         description: Login realizado com sucesso
  *       401:
- *         description: Credenciais inválidas ou não é ADMIN
+ *         description: Credenciais inválidas
  */
 router.post('/login', async (req, res) => {
   const { email, password } = req.body as { email: string; password: string };
   const user = await prisma.user.findUnique({ where: { email } });
-  if (!user || user.role !== 'ADMIN') return res.status(401).json({ message: 'Credenciais inválidas' });
+  if (!user) return res.status(401).json({ message: 'Credenciais inválidas' });
+  
   const ok = await bcrypt.compare(password, user.password);
   if (!ok) return res.status(401).json({ message: 'Credenciais inválidas' });
 
