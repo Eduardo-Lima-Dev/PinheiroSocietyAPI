@@ -34,7 +34,7 @@ const router = Router();
  *       200:
  *         description: Login realizado com sucesso
  *       401:
- *         description: Credenciais inválidas
+  *         description: Credenciais inválidas
  */
 router.post('/login', async (req, res) => {
   const { email, password } = req.body as { email: string; password: string };

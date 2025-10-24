@@ -13,6 +13,7 @@ import clientesRouter from './routes/clientes.js';
 import quadrasRouter from './routes/quadras.js';
 import reservasRouter from './routes/reservas.js';
 import adminRouter from './routes/admin.js';
+import lancamentosRouter from './routes/lancamentos.js';
 import reservasJob from './jobs/reservas-job.js';
 
 const app = express();
@@ -36,6 +37,7 @@ app.use('/clientes', clientesRouter);
 app.use('/quadras', quadrasRouter);
 app.use('/reservas', reservasRouter);
 app.use('/admin', adminRouter);
+app.use('/lancamentos', lancamentosRouter);
 
 /**
  * @swagger

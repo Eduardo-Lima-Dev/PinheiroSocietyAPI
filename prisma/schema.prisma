@@ -28,6 +28,7 @@ model Cliente {
   updatedAt   DateTime  @updatedAt
   comandas    Comanda[]
   reservas    Reserva[]
+  lancamentos Lancamento[]
 }
 
 model Quadra {
@@ -49,6 +50,7 @@ model Produto {
   createdAt    DateTime        @default(now())
   updatedAt    DateTime        @updatedAt
   comandaItems ComandaItem[]
+  lancamentoItems LancamentoItem[]
   estoque      Estoque?
 }
 
@@ -107,6 +109,29 @@ model ComandaItem {
   produtoId   Int?
   comanda     Comanda  @relation(fields: [comandaId], references: [id])
   produto     Produto? @relation(fields: [produtoId], references: [id])
+}
+
+model Lancamento {
+  id              Int            @id @default(autoincrement())
+  clienteId       Int?
+  nomeCliente     String?
+  items           LancamentoItem[]
+  totalCents      Int            @default(0)
+  payment         PaymentMethod
+  createdAt       DateTime       @default(now())
+  cliente         Cliente?       @relation(fields: [clienteId], references: [id])
+}
+
+model LancamentoItem {
+  id            Int         @id @default(autoincrement())
+  lancamentoId  Int
+  produtoId     Int?
+  description   String
+  quantity      Int         @default(1)
+  unitCents     Int
+  createdAt     DateTime    @default(now())
+  lancamento    Lancamento  @relation(fields: [lancamentoId], references: [id])
+  produto       Produto?    @relation(fields: [produtoId], references: [id])
 }
 
 enum UserRole {

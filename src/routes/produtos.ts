@@ -221,4 +221,96 @@ router.get('/estoque-baixo', async (req, res) => {
   res.json(produtosEstoqueBaixo);
 });
 
+/**
+ * @swagger
+ * /produtos/{id}/entrada-estoque:
+ *   post:
+ *     tags: [Produtos]
+ *     summary: Adiciona quantidade ao estoque de um produto
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [quantidade]
+ *             properties:
+ *               quantidade:
+ *                 type: integer
+ *                 minimum: 1
+ *               observacao:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Estoque atualizado com sucesso
+ *       404:
+ *         description: Produto não encontrado
+ *       400:
+ *         description: Quantidade inválida
+ */
+router.post('/:id/entrada-estoque', async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const { quantidade, observacao } = req.body;
+
+    // Validações
+    if (!quantidade || quantidade <= 0) {
+      return res.status(400).json({ message: 'Quantidade deve ser maior que zero' });
+    }
+
+    // Verificar se produto existe
+    const produto = await prisma.produto.findUnique({
+      where: { id },
+      include: { estoque: true }
+    });
+
+    if (!produto) {
+      return res.status(404).json({ message: 'Produto não encontrado' });
+    }
+
+    // Buscar estoque atual
+    const estoqueAtual = produto.estoque;
+    const quantidadeAnterior = estoqueAtual?.quantidade || 0;
+    const novaQuantidade = quantidadeAnterior + quantidade;
+
+    // Atualizar ou criar estoque
+    const estoqueAtualizado = await prisma.estoque.upsert({
+      where: { produtoId: id },
+      update: { 
+        quantidade: novaQuantidade,
+        updatedAt: new Date()
+      },
+      create: { 
+        produtoId: id, 
+        quantidade: novaQuantidade,
+        minQuantidade: 0
+      }
+    });
+
+    res.json({
+      message: 'Entrada de estoque realizada com sucesso',
+      produto: {
+        id: produto.id,
+        name: produto.name
+      },
+      estoque: {
+        quantidadeAnterior,
+        quantidadeAdicionada: quantidade,
+        novaQuantidade: estoqueAtualizado.quantidade,
+        minQuantidade: estoqueAtualizado.minQuantidade,
+        observacao: observacao || null
+      }
+    });
+  } catch (error) {
+    console.error('Erro ao adicionar entrada de estoque:', error);
+    res.status(500).json({ message: 'Erro interno do servidor' });
+  }
+});
+
 export default router;

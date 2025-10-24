@@ -76,16 +76,49 @@ router.get('/faturamento', async (req, res) => {
   const totalComandas = comandas.reduce((acc, c) => acc + c.totalCents, 0);
   const totalComandasCount = comandas.length;
 
-  // Faturamento por forma de pagamento
-  const faturamentoPorPagamento = comandas.reduce((acc, c) => {
+  // Faturamento de lançamentos
+  const lancamentos = await prisma.lancamento.findMany({
+    where: {
+      createdAt: {
+        gte: inicio,
+        lte: fim
+      }
+    },
+    include: {
+      items: true,
+      cliente: { select: { nomeCompleto: true, telefone: true } }
+    }
+  });
+
+  const totalLancamentos = lancamentos.reduce((acc, l) => acc + l.totalCents, 0);
+  const totalLancamentosCount = lancamentos.length;
+
+  // Faturamento por forma de pagamento (comandas)
+  const faturamentoPorPagamentoComandas = comandas.reduce((acc, c) => {
     const payment = c.payment || 'SEM_PAGAMENTO';
     acc[payment] = (acc[payment] || 0) + c.totalCents;
     return acc;
   }, {} as Record<string, number>);
 
-  // Produtos mais vendidos
-  const produtosVendidos = comandas.flatMap(c => c.items);
-  const produtosAgrupados = produtosVendidos.reduce((acc, item) => {
+  // Faturamento por forma de pagamento (lançamentos)
+  const faturamentoPorPagamentoLancamentos = lancamentos.reduce((acc, l) => {
+    const payment = l.payment;
+    acc[payment] = (acc[payment] || 0) + l.totalCents;
+    return acc;
+  }, {} as Record<string, number>);
+
+  // Faturamento total por pagamento
+  const faturamentoPorPagamento = { ...faturamentoPorPagamentoComandas };
+  Object.entries(faturamentoPorPagamentoLancamentos).forEach(([payment, valor]) => {
+    faturamentoPorPagamento[payment] = (faturamentoPorPagamento[payment] || 0) + valor;
+  });
+
+  // Produtos mais vendidos (comandas + lançamentos)
+  const produtosVendidosComandas = comandas.flatMap(c => c.items);
+  const produtosVendidosLancamentos = lancamentos.flatMap(l => l.items);
+  const todosProdutosVendidos = [...produtosVendidosComandas, ...produtosVendidosLancamentos];
+  
+  const produtosAgrupados = todosProdutosVendidos.reduce((acc, item) => {
     const key = item.produtoId ? `produto_${item.produtoId}` : `custom_${item.description}`;
     if (!acc[key]) {
       acc[key] = {
@@ -104,13 +137,24 @@ router.get('/faturamento', async (req, res) => {
     .sort((a: any, b: any) => b.quantidade - a.quantidade)
     .slice(0, 10);
 
+  const faturamentoTotal = totalComandas + totalLancamentos;
+
   res.json({
     periodo: { dataInicio, dataFim },
+    faturamentoTotal,
+    faturamentoPorTipoVenda: {
+      comandas: totalComandas,
+      lancamentos: totalLancamentos
+    },
     comandas: {
       totalCents: totalComandas,
-      totalCount: totalComandasCount,
-      faturamentoPorPagamento
+      totalCount: totalComandasCount
     },
+    lancamentos: {
+      totalCents: totalLancamentos,
+      totalCount: totalLancamentosCount
+    },
+    faturamentoPorPagamento,
     produtosMaisVendidos
   });
 });
@@ -142,7 +186,20 @@ router.get('/dashboard', async (req, res) => {
     }
   });
 
-  const faturamentoMes = comandasMes.reduce((acc, c) => acc + c.totalCents, 0);
+  const faturamentoComandasMes = comandasMes.reduce((acc, c) => acc + c.totalCents, 0);
+
+  // Lançamentos do mês
+  const lancamentosMes = await prisma.lancamento.findMany({
+    where: {
+      createdAt: {
+        gte: inicioMes,
+        lte: fimMes
+      }
+    }
+  });
+
+  const faturamentoLancamentosMes = lancamentosMes.reduce((acc, l) => acc + l.totalCents, 0);
+  const faturamentoMes = faturamentoComandasMes + faturamentoLancamentosMes;
 
   // Reservas do mês
   const reservasMes = await prisma.reserva.count({
@@ -191,7 +248,12 @@ router.get('/dashboard', async (req, res) => {
     mes: {
       faturamentoCents: faturamentoMes,
       comandasCount: comandasMes.length,
-      reservasCount: reservasMes
+      lancamentosCount: lancamentosMes.length,
+      reservasCount: reservasMes,
+      faturamentoPorTipo: {
+        comandas: faturamentoComandasMes,
+        lancamentos: faturamentoLancamentosMes
+      }
     },
     hoje: {
       reservas: reservasHoje.map(r => ({
