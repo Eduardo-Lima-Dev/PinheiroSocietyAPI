@@ -165,10 +165,122 @@ router.get('/faturamento', async (req, res) => {
  * /relatorios/dashboard:
  *   get:
  *     tags: [Relatórios]
- *     summary: Dashboard com resumo geral
+ *     summary: Dashboard com resumo geral e métricas operacionais
  *     responses:
  *       200:
- *         description: Dashboard com resumo
+ *         description: Dashboard com resumo completo
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 mes:
+ *                   type: object
+ *                   properties:
+ *                     faturamentoCents:
+ *                       type: integer
+ *                       description: Faturamento total do mês em centavos
+ *                     comandasCount:
+ *                       type: integer
+ *                       description: Número de comandas do mês
+ *                     lancamentosCount:
+ *                       type: integer
+ *                       description: Número de lançamentos do mês
+ *                     reservasCount:
+ *                       type: integer
+ *                       description: Número de reservas ativas do mês
+ *                     faturamentoPorTipo:
+ *                       type: object
+ *                       properties:
+ *                         comandas:
+ *                           type: integer
+ *                         lancamentos:
+ *                           type: integer
+ *                 hoje:
+ *                   type: object
+ *                   properties:
+ *                     reservas:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           id:
+ *                             type: integer
+ *                           quadra:
+ *                             type: string
+ *                           hora:
+ *                             type: integer
+ *                           cliente:
+ *                             type: string
+ *                           precoCents:
+ *                             type: integer
+ *                     receitaHoje:
+ *                       type: object
+ *                       properties:
+ *                         totalCents:
+ *                           type: integer
+ *                           description: Receita total de hoje em centavos
+ *                         mediaDiaria30Dias:
+ *                           type: integer
+ *                           description: Média diária dos últimos 30 dias em centavos
+ *                         variacao:
+ *                           type: integer
+ *                           description: Variação percentual (ex: 15 para +15%)
+ *                         variacaoTipo:
+ *                           type: string
+ *                           enum: [positiva, negativa, neutro]
+ *                 alertas:
+ *                   type: object
+ *                   properties:
+ *                     estoqueBaixo:
+ *                       type: integer
+ *                       description: Número de produtos com estoque baixo
+ *                     produtos:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           id:
+ *                             type: integer
+ *                           name:
+ *                             type: string
+ *                           quantidade:
+ *                             type: integer
+ *                           minQuantidade:
+ *                             type: integer
+ *                 statusQuadras:
+ *                   type: object
+ *                   properties:
+ *                     mesasOcupadas:
+ *                       type: integer
+ *                       description: Número de quadras ocupadas no horário atual
+ *                     totalMesas:
+ *                       type: integer
+ *                       description: Total de quadras ativas no sistema
+ *                 horariosOcupados:
+ *                   type: object
+ *                   properties:
+ *                     percentualOcupacao:
+ *                       type: integer
+ *                       description: Percentual de ocupação dos horários hoje (ex: 78)
+ *                     totalSlots:
+ *                       type: integer
+ *                       description: Total de slots de horários disponíveis (6h-23h = 18)
+ *                     slotsOcupados:
+ *                       type: integer
+ *                       description: Número de slots ocupados hoje
+ *                     horarioPico:
+ *                       type: object
+ *                       properties:
+ *                         inicio:
+ *                           type: integer
+ *                           description: Hora de início do pico (formato 24h)
+ *                         fim:
+ *                           type: integer
+ *                           description: Hora de fim do pico (formato 24h)
+ *                         totalReservas:
+ *                           type: integer
+ *                           description: Total de reservas no horário de pico
  */
 router.get('/dashboard', async (req, res) => {
   const hoje = new Date();
@@ -244,6 +356,117 @@ router.get('/dashboard', async (req, res) => {
     orderBy: { hora: 'asc' }
   });
 
+  // 1. Status das Quadras (Mesas Ocupadas vs Total)
+  const totalQuadras = await prisma.quadra.count({
+    where: { ativa: true }
+  });
+
+  const horaAtual = hoje.getHours();
+  const quadrasOcupadasAgora = await prisma.reserva.count({
+    where: {
+      data: {
+        gte: hojeInicio,
+        lte: hojeFim
+      },
+      hora: horaAtual,
+      status: 'ATIVA'
+    }
+  });
+
+  // 2. Receita Hoje com Comparação Histórica
+  const comandasHoje = await prisma.comanda.findMany({
+    where: {
+      closedAt: {
+        gte: hojeInicio,
+        lte: hojeFim
+      },
+      payment: { not: null }
+    }
+  });
+
+  const lancamentosHoje = await prisma.lancamento.findMany({
+    where: {
+      createdAt: {
+        gte: hojeInicio,
+        lte: hojeFim
+      }
+    }
+  });
+
+  const receitaHoje = comandasHoje.reduce((acc, c) => acc + c.totalCents, 0) + 
+                     lancamentosHoje.reduce((acc, l) => acc + l.totalCents, 0);
+
+  // Calcular média dos últimos 30 dias
+  const data30DiasAtras = new Date(hoje);
+  data30DiasAtras.setDate(hoje.getDate() - 30);
+
+  const comandas30Dias = await prisma.comanda.findMany({
+    where: {
+      closedAt: {
+        gte: data30DiasAtras,
+        lte: hojeFim
+      },
+      payment: { not: null }
+    }
+  });
+
+  const lancamentos30Dias = await prisma.lancamento.findMany({
+    where: {
+      createdAt: {
+        gte: data30DiasAtras,
+        lte: hojeFim
+      }
+    }
+  });
+
+  const receita30Dias = comandas30Dias.reduce((acc, c) => acc + c.totalCents, 0) + 
+                       lancamentos30Dias.reduce((acc, l) => acc + l.totalCents, 0);
+  
+  const mediaDiaria30Dias = receita30Dias / 30;
+  const variacao = mediaDiaria30Dias > 0 ? 
+    ((receitaHoje - mediaDiaria30Dias) / mediaDiaria30Dias) * 100 : 0;
+  
+  const variacaoTipo = variacao > 5 ? 'positiva' : variacao < -5 ? 'negativa' : 'neutro';
+
+  // 3. Horários Ocupados
+  const todasReservasHoje = await prisma.reserva.findMany({
+    where: {
+      data: {
+        gte: hojeInicio,
+        lte: hojeFim
+      }
+    },
+    select: { hora: true }
+  });
+
+  // Definir horários de funcionamento (6h às 23h = 18 slots)
+  const horariosFuncionamento = Array.from({ length: 18 }, (_, i) => i + 6);
+  const slotsOcupados = new Set(todasReservasHoje.map(r => r.hora)).size;
+  const percentualOcupacao = Math.round((slotsOcupados / horariosFuncionamento.length) * 100);
+
+  // Identificar horário de pico (intervalo de 3h com mais reservas)
+  const reservasPorHora = todasReservasHoje.reduce((acc, r) => {
+    acc[r.hora] = (acc[r.hora] || 0) + 1;
+    return acc;
+  }, {} as Record<number, number>);
+
+  let maxReservas = 0;
+  let horarioPicoInicio = 6;
+  let horarioPicoFim = 9;
+
+  // Verificar intervalos de 3 horas
+  for (let inicio = 6; inicio <= 20; inicio++) {
+    const fim = inicio + 3;
+    const totalReservasIntervalo = Array.from({ length: 3 }, (_, i) => inicio + i)
+      .reduce((acc, hora) => acc + (reservasPorHora[hora] || 0), 0);
+    
+    if (totalReservasIntervalo > maxReservas) {
+      maxReservas = totalReservasIntervalo;
+      horarioPicoInicio = inicio;
+      horarioPicoFim = fim;
+    }
+  }
+
   res.json({
     mes: {
       faturamentoCents: faturamentoMes,
@@ -262,7 +485,13 @@ router.get('/dashboard', async (req, res) => {
         hora: r.hora,
         cliente: r.cliente.nomeCompleto,
         precoCents: r.precoCents
-      }))
+      })),
+      receitaHoje: {
+        totalCents: receitaHoje,
+        mediaDiaria30Dias: Math.round(mediaDiaria30Dias),
+        variacao: Math.round(variacao),
+        variacaoTipo
+      }
     },
     alertas: {
       estoqueBaixo: estoqueBaixo.length,
@@ -272,6 +501,20 @@ router.get('/dashboard', async (req, res) => {
         quantidade: p.estoque?.quantidade || 0,
         minQuantidade: p.estoque?.minQuantidade || 0
       }))
+    },
+    statusQuadras: {
+      mesasOcupadas: quadrasOcupadasAgora,
+      totalMesas: totalQuadras
+    },
+    horariosOcupados: {
+      percentualOcupacao,
+      totalSlots: horariosFuncionamento.length,
+      slotsOcupados,
+      horarioPico: {
+        inicio: horarioPicoInicio,
+        fim: horarioPicoFim,
+        totalReservas: maxReservas
+      }
     }
   });
 });
