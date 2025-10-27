@@ -13,6 +13,233 @@ const router = Router();
 /**
  * @swagger
  * /comandas:
+ *   get:
+ *     tags: [Comandas]
+ *     summary: Lista comandas com filtros opcionais
+ *     parameters:
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [aberta, fechada]
+ *         description: Filtrar por status da comanda
+ *       - in: query
+ *         name: clienteId
+ *         schema:
+ *           type: integer
+ *         description: Filtrar por ID do cliente
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 50
+ *           minimum: 1
+ *           maximum: 100
+ *         description: Limite de resultados por página
+ *       - in: query
+ *         name: offset
+ *         schema:
+ *           type: integer
+ *           default: 0
+ *           minimum: 0
+ *         description: Número de registros para pular
+ *       - in: query
+ *         name: dataInicio
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Data de início para filtrar comandas fechadas (formato YYYY-MM-DD)
+ *       - in: query
+ *         name: dataFim
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Data de fim para filtrar comandas fechadas (formato YYYY-MM-DD)
+ *     responses:
+ *       200:
+ *         description: Lista de comandas
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 comandas:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: integer
+ *                       clienteId:
+ *                         type: integer
+ *                         nullable: true
+ *                       openedAt:
+ *                         type: string
+ *                         format: date-time
+ *                       closedAt:
+ *                         type: string
+ *                         format: date-time
+ *                         nullable: true
+ *                       totalCents:
+ *                         type: integer
+ *                       payment:
+ *                         type: string
+ *                         enum: [CASH, PIX, CARD]
+ *                         nullable: true
+ *                       notes:
+ *                         type: string
+ *                         nullable: true
+ *                       cliente:
+ *                         type: object
+ *                         nullable: true
+ *                         properties:
+ *                           id:
+ *                             type: integer
+ *                           nomeCompleto:
+ *                             type: string
+ *                           telefone:
+ *                             type: string
+ *                       items:
+ *                         type: array
+ *                         items:
+ *                           type: object
+ *                           properties:
+ *                             id:
+ *                               type: integer
+ *                             description:
+ *                               type: string
+ *                             quantity:
+ *                               type: integer
+ *                             unitCents:
+ *                               type: integer
+ *                             produtoId:
+ *                               type: integer
+ *                               nullable: true
+ *                 total:
+ *                   type: integer
+ *                   description: Total de comandas encontradas
+ *                 pagination:
+ *                   type: object
+ *                   properties:
+ *                     limit:
+ *                       type: integer
+ *                     offset:
+ *                       type: integer
+ *                     hasMore:
+ *                       type: boolean
+ *       400:
+ *         description: Parâmetros inválidos
+ */
+router.get('/', async (req, res) => {
+  const { 
+    status, 
+    clienteId, 
+    limit = 50, 
+    offset = 0, 
+    dataInicio, 
+    dataFim 
+  } = req.query as { 
+    status?: 'aberta' | 'fechada'; 
+    clienteId?: string; 
+    limit?: string; 
+    offset?: string; 
+    dataInicio?: string; 
+    dataFim?: string; 
+  };
+
+  // Validar parâmetros numéricos
+  const limitNum = Math.min(Math.max(Number(limit) || 50, 1), 100);
+  const offsetNum = Math.max(Number(offset) || 0, 0);
+
+  // Construir filtros
+  const where: any = {};
+
+  // Filtro por status
+  if (status === 'aberta') {
+    where.closedAt = null;
+  } else if (status === 'fechada') {
+    where.closedAt = { not: null };
+  }
+
+  // Filtro por cliente
+  if (clienteId) {
+    const clienteIdNum = Number(clienteId);
+    if (isNaN(clienteIdNum)) {
+      return res.status(400).json({ message: 'clienteId deve ser um número válido' });
+    }
+    where.clienteId = clienteIdNum;
+  }
+
+  // Filtro por data (apenas para comandas fechadas)
+  if (dataInicio || dataFim) {
+    if (!where.closedAt) {
+      where.closedAt = { not: null }; // Força filtrar apenas comandas fechadas
+    }
+
+    const dateFilter: any = {};
+    
+    if (dataInicio) {
+      const inicio = new Date(dataInicio + 'T00:00:00');
+      if (isNaN(inicio.getTime())) {
+        return res.status(400).json({ message: 'dataInicio deve estar no formato YYYY-MM-DD' });
+      }
+      dateFilter.gte = inicio;
+    }
+    
+    if (dataFim) {
+      const fim = new Date(dataFim + 'T23:59:59');
+      if (isNaN(fim.getTime())) {
+        return res.status(400).json({ message: 'dataFim deve estar no formato YYYY-MM-DD' });
+      }
+      dateFilter.lte = fim;
+    }
+
+    if (Object.keys(dateFilter).length > 0) {
+      where.closedAt = { ...where.closedAt, ...dateFilter };
+    }
+  }
+
+  try {
+    // Buscar comandas
+    const comandas = await prisma.comanda.findMany({
+      where,
+      include: {
+        items: true,
+        cliente: { 
+          select: { 
+            id: true, 
+            nomeCompleto: true, 
+            telefone: true 
+          } 
+        }
+      },
+      orderBy: { openedAt: 'desc' },
+      take: limitNum,
+      skip: offsetNum
+    });
+
+    // Contar total para paginação
+    const total = await prisma.comanda.count({ where });
+
+    res.json({
+      comandas,
+      total,
+      pagination: {
+        limit: limitNum,
+        offset: offsetNum,
+        hasMore: offsetNum + limitNum < total
+      }
+    });
+
+  } catch (error) {
+    console.error('Erro ao buscar comandas:', error);
+    res.status(500).json({ message: 'Erro interno do servidor' });
+  }
+});
+
+/**
+ * @swagger
+ * /comandas:
  *   post:
  *     tags: [Comandas]
  *     summary: Abre uma comanda

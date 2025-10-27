@@ -1,8 +1,7 @@
 import { Router } from 'express';
-import { PrismaClient } from '../generated/prisma';
+import { prisma } from '../lib/prisma.js';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 /**
  * @swagger
