@@ -203,16 +203,22 @@ router.get('/', async (req, res) => {
     // Buscar comandas
     const comandas = await prisma.comanda.findMany({
       where,
-      include: {
-        items: true,
-        cliente: { 
-          select: { 
-            id: true, 
-            nomeCompleto: true, 
-            telefone: true 
-          } 
-        }
+    include: {
+      items: true,
+      cliente: { 
+        select: { 
+          id: true, 
+          nomeCompleto: true, 
+          telefone: true 
+        } 
       },
+      mesa: {
+        select: {
+          id: true,
+          numero: true
+        }
+      }
+    },
       orderBy: { openedAt: 'desc' },
       take: limitNum,
       skip: offsetNum
@@ -253,6 +259,9 @@ router.get('/', async (req, res) => {
  *               clienteId:
  *                 type: integer
  *                 description: ID do cliente (opcional)
+ *               mesaId:
+ *                 type: integer
+ *                 description: ID da mesa (opcional)
  *               notes:
  *                 type: string
  *     responses:
@@ -260,7 +269,7 @@ router.get('/', async (req, res) => {
  *         description: Comanda aberta
  */
 router.post('/', async (req, res) => {
-  const { clienteId, notes } = req.body as { clienteId?: number; notes?: string };
+  const { clienteId, mesaId, notes } = req.body as { clienteId?: number; mesaId?: number; notes?: string };
   
   // Se clienteId foi informado, verificar se cliente existe
   if (clienteId) {
@@ -269,10 +278,19 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ message: 'Cliente não encontrado' });
     }
   }
+
+  // Se mesaId foi informado, verificar se mesa existe
+  if (mesaId) {
+    const mesa = await prisma.mesa.findUnique({ where: { id: mesaId } });
+    if (!mesa) {
+      return res.status(400).json({ message: 'Mesa não encontrada' });
+    }
+  }
   
   const comanda = await prisma.comanda.create({ 
     data: { 
-      clienteId: clienteId ?? null, 
+      clienteId: clienteId ?? null,
+      mesaId: mesaId ?? null,
       notes: notes ?? null 
     } 
   });
@@ -309,7 +327,13 @@ router.get('/:id', async (req, res) => {
           nomeCompleto: true, 
           telefone: true 
         } 
-      } 
+      },
+      mesa: {
+        select: {
+          id: true,
+          numero: true
+        }
+      }
     } 
   });
   if (!comanda) return res.status(404).json({ message: 'Comanda não encontrada' });

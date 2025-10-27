@@ -225,7 +225,7 @@ router.get('/faturamento', async (req, res) => {
  *                           description: Média diária dos últimos 30 dias em centavos
  *                         variacao:
  *                           type: integer
- *                           description: Variação percentual (ex: 15 para +15%)
+ *                           description: "Variação percentual (ex: 15 para +15%)"
  *                         variacaoTipo:
  *                           type: string
  *                           enum: [positiva, negativa, neutro]
@@ -248,24 +248,24 @@ router.get('/faturamento', async (req, res) => {
  *                             type: integer
  *                           minQuantidade:
  *                             type: integer
- *                 statusQuadras:
+ *                 statusMesas:
  *                   type: object
  *                   properties:
  *                     mesasOcupadas:
  *                       type: integer
- *                       description: Número de quadras ocupadas no horário atual
+ *                       description: Número de mesas ocupadas no momento
  *                     totalMesas:
  *                       type: integer
- *                       description: Total de quadras ativas no sistema
+ *                       description: Total de mesas ativas no sistema
  *                 horariosOcupados:
  *                   type: object
  *                   properties:
  *                     percentualOcupacao:
  *                       type: integer
- *                       description: Percentual de ocupação dos horários hoje (ex: 78)
+ *                       description: "Percentual de ocupação dos horários hoje (ex: 78)"
  *                     totalSlots:
  *                       type: integer
- *                       description: Total de slots de horários disponíveis (6h-23h = 18)
+ *                       description: "Total de slots de horários disponíveis (6h-23h = 18)"
  *                     slotsOcupados:
  *                       type: integer
  *                       description: Número de slots ocupados hoje
@@ -274,10 +274,10 @@ router.get('/faturamento', async (req, res) => {
  *                       properties:
  *                         inicio:
  *                           type: integer
- *                           description: Hora de início do pico (formato 24h)
+ *                           description: "Hora de início do pico (formato 24h)"
  *                         fim:
  *                           type: integer
- *                           description: Hora de fim do pico (formato 24h)
+ *                           description: "Hora de fim do pico (formato 24h)"
  *                         totalReservas:
  *                           type: integer
  *                           description: Total de reservas no horário de pico
@@ -356,20 +356,15 @@ router.get('/dashboard', async (req, res) => {
     orderBy: { hora: 'asc' }
   });
 
-  // 1. Status das Quadras (Mesas Ocupadas vs Total)
-  const totalQuadras = await prisma.quadra.count({
+  // 1. Status das Mesas (Mesas Ocupadas vs Total)
+  const totalMesas = await prisma.mesa.count({
     where: { ativa: true }
   });
 
-  const horaAtual = hoje.getHours();
-  const quadrasOcupadasAgora = await prisma.reserva.count({
+  const mesasOcupadas = await prisma.mesa.count({
     where: {
-      data: {
-        gte: hojeInicio,
-        lte: hojeFim
-      },
-      hora: horaAtual,
-      status: 'ATIVA'
+      ativa: true,
+      clienteId: { not: null }
     }
   });
 
@@ -502,9 +497,9 @@ router.get('/dashboard', async (req, res) => {
         minQuantidade: p.estoque?.minQuantidade || 0
       }))
     },
-    statusQuadras: {
-      mesasOcupadas: quadrasOcupadasAgora,
-      totalMesas: totalQuadras
+    statusMesas: {
+      mesasOcupadas,
+      totalMesas
     },
     horariosOcupados: {
       percentualOcupacao,

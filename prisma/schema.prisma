@@ -29,6 +29,19 @@ model Cliente {
   comandas    Comanda[]
   reservas    Reserva[]
   lancamentos Lancamento[]
+  mesas       Mesa[]    // Mesas onde o cliente está (opcional)
+}
+
+model Mesa {
+  id          Int       @id @default(autoincrement())
+  numero      Int       @unique
+  ativa       Boolean   @default(true)
+  clienteId   Int?      // Cliente atual na mesa (opcional - pode estar livre)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  cliente     Cliente?  @relation(fields: [clienteId], references: [id])
+  comandas    Comanda[] // Uma mesa pode ter várias comandas
 }
 
 model Quadra {
@@ -90,12 +103,14 @@ model Reserva {
 model Comanda {
   id           Int            @id @default(autoincrement())
   clienteId    Int?
+  mesaId       Int?           // Relação com mesa (opcional)
   openedAt     DateTime       @default(now())
   closedAt     DateTime?
   totalCents   Int            @default(0)
   payment      PaymentMethod?
   notes        String?
   cliente      Cliente?       @relation(fields: [clienteId], references: [id])
+  mesa         Mesa?          @relation(fields: [mesaId], references: [id])
   items        ComandaItem[]
 }
 

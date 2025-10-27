@@ -14,6 +14,7 @@ import quadrasRouter from './routes/quadras.js';
 import reservasRouter from './routes/reservas.js';
 import adminRouter from './routes/admin.js';
 import lancamentosRouter from './routes/lancamentos.js';
+import mesasRouter from './routes/mesas.js';
 import reservasJob from './jobs/reservas-job.js';
 
 const app = express();
@@ -38,6 +39,7 @@ app.use('/quadras', quadrasRouter);
 app.use('/reservas', reservasRouter);
 app.use('/admin', adminRouter);
 app.use('/lancamentos', lancamentosRouter);
+app.use('/mesas', mesasRouter);
 
 /**
  * @swagger
