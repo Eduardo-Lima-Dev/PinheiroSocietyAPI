@@ -7,7 +7,11 @@
 
 */
 -- CreateEnum
-CREATE TYPE "public"."ReservaStatus" AS ENUM ('ATIVA', 'CANCELADA', 'CONCLUIDA');
+DO $$ BEGIN
+ CREATE TYPE "public"."ReservaStatus" AS ENUM ('ATIVA', 'CANCELADA', 'CONCLUIDA');
+EXCEPTION
+ WHEN duplicate_object THEN null;
+END $$;
 
 -- DropForeignKey
 ALTER TABLE "public"."Comanda" DROP CONSTRAINT "Comanda_userId_fkey";
