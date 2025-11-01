@@ -28,6 +28,7 @@ router.get('/', async (_req, res) => {
       cpf: true,
       email: true,
       telefone: true,
+      tipo: true,
       createdAt: true,
       updatedAt: true
     },
@@ -56,7 +57,7 @@ router.get('/', async (_req, res) => {
  */
 router.get('/:id', async (req, res) => {
   const id = Number(req.params.id);
-  const cliente = await prisma.cliente.findUnique({
+  const cliente = await prisma.cliente. findUnique({
     where: { id },
     include: {
       comandas: {
@@ -116,6 +117,11 @@ router.get('/:id', async (req, res) => {
  *                 type: string
  *               telefone:
  *                 type: string
+ *               tipo:
+ *                 type: string
+ *                 enum: [FIXO, VISITANTE]
+ *                 default: VISITANTE
+ *                 description: Tipo de cliente (FIXO para mensalista ou VISITANTE)
  *     responses:
  *       201:
  *         description: Cliente criado
@@ -123,11 +129,12 @@ router.get('/:id', async (req, res) => {
  *         description: CPF ou email já cadastrado
  */
 router.post('/', async (req, res) => {
-  const { nomeCompleto, cpf, email, telefone } = req.body as {
+  const { nomeCompleto, cpf, email, telefone, tipo } = req.body as {
     nomeCompleto: string;
     cpf: string;
     email: string;
     telefone: string;
+    tipo?: 'FIXO' | 'VISITANTE';
   };
 
   // Verificar se CPF ou email já existem
@@ -145,12 +152,18 @@ router.post('/', async (req, res) => {
     return res.status(409).json({ message: `${field} já cadastrado` });
   }
 
+  // Validar tipo se fornecido
+  if (tipo && !['FIXO', 'VISITANTE'].includes(tipo)) {
+    return res.status(400).json({ message: 'Tipo de cliente inválido. Use FIXO ou VISITANTE' });
+  }
+
   const cliente = await prisma.cliente.create({
     data: {
       nomeCompleto,
       cpf,
       email,
-      telefone
+      telefone,
+      tipo: tipo || 'VISITANTE'
     }
   });
 
@@ -194,11 +207,12 @@ router.post('/', async (req, res) => {
  */
 router.put('/:id', async (req, res) => {
   const id = Number(req.params.id);
-  const { nomeCompleto, cpf, email, telefone } = req.body as {
+  const { nomeCompleto, cpf, email, telefone, tipo } = req.body as {
     nomeCompleto?: string;
     cpf?: string;
     email?: string;
     telefone?: string;
+    tipo?: 'FIXO' | 'VISITANTE';
   };
 
   // Verificar se cliente existe
@@ -229,13 +243,19 @@ router.put('/:id', async (req, res) => {
     }
   }
 
+  // Validar tipo se fornecido
+  if (tipo && !['FIXO', 'VISITANTE'].includes(tipo)) {
+    return res.status(400).json({ message: 'Tipo de cliente inválido. Use FIXO ou VISITANTE' });
+  }
+
   const cliente = await prisma.cliente.update({
     where: { id },
     data: {
       ...(nomeCompleto && { nomeCompleto }),
       ...(cpf && { cpf }),
       ...(email && { email }),
-      ...(telefone && { telefone })
+      ...(telefone && { telefone }),
+      ...(tipo && { tipo })
     }
   });
 
@@ -328,7 +348,8 @@ router.get('/buscar', async (req, res) => {
       nomeCompleto: true,
       cpf: true,
       email: true,
-      telefone: true
+      telefone: true,
+      tipo: true
     },
     orderBy: { nomeCompleto: 'asc' },
     take: 20

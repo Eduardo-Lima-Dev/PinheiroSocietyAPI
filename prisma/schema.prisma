@@ -19,17 +19,18 @@ model User {
 }
 
 model Cliente {
-  id          Int       @id @default(autoincrement())
+  id          Int         @id @default(autoincrement())
   nomeCompleto String
-  cpf         String    @unique
-  email       String    @unique
+  cpf         String      @unique
+  email       String      @unique
   telefone    String
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  tipo        ClienteTipo @default(VISITANTE)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
   comandas    Comanda[]
   reservas    Reserva[]
   lancamentos Lancamento[]
-  mesas       Mesa[]    // Mesas onde o cliente está (opcional)
+  mesas       Mesa[]      // Mesas onde o cliente está (opcional)
 }
 
 model Mesa {
@@ -77,24 +78,28 @@ model Estoque {
 }
 
 model Reserva {
-  id                   Int       @id @default(autoincrement())
+  id                   Int             @id @default(autoincrement())
   clienteId            Int
   quadraId             Int
   data                 DateTime
   hora                 Int
   precoCents           Int
-  status               ReservaStatus @default(ATIVA)
+  status               ReservaStatus   @default(ATIVA)
   observacoes          String?
-  recorrente           Boolean   @default(false)
-  diaSemana            Int?      // 0=domingo, 1=segunda, ..., 6=sábado
-  dataFimRecorrencia   DateTime? // Data limite para a recorrência
-  reservaPaiId         Int?      // ID da reserva original que gerou esta recorrência
-  createdAt            DateTime  @default(now())
-  updatedAt            DateTime  @updatedAt
-  cliente              Cliente   @relation(fields: [clienteId], references: [id])
-  quadra               Quadra    @relation(fields: [quadraId], references: [id])
-  reservaPai           Reserva?  @relation("ReservaRecorrencia", fields: [reservaPaiId], references: [id])
-  reservasFilhas       Reserva[] @relation("ReservaRecorrencia")
+  recorrente           Boolean         @default(false)
+  diaSemana            Int?            // 0=domingo, 1=segunda, ..., 6=sábado
+  dataFimRecorrencia   DateTime?       // Data limite para a recorrência
+  reservaPaiId         Int?            // ID da reserva original que gerou esta recorrência
+  payment              PaymentMethod?   // Método de pagamento
+  valorPagoCents       Int            @default(0) // Valor já pago em centavos
+  percentualPago       Int             @default(0) // 0, 50 ou 100
+  statusPagamento      PagamentoStatus @default(PENDENTE)
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+  cliente              Cliente        @relation(fields: [clienteId], references: [id])
+  quadra               Quadra         @relation(fields: [quadraId], references: [id])
+  reservaPai           Reserva?       @relation("ReservaRecorrencia", fields: [reservaPaiId], references: [id])
+  reservasFilhas       Reserva[]      @relation("ReservaRecorrencia")
 
   @@unique([data, hora, quadraId])
 }
@@ -167,8 +172,19 @@ enum ProductCategory {
   OUTROS
 }
 
+enum ClienteTipo {
+  FIXO
+  VISITANTE
+}
+
 enum ReservaStatus {
   ATIVA
   CANCELADA
   CONCLUIDA
+}
+
+enum PagamentoStatus {
+  PENDENTE
+  PARCIAL
+  TOTAL
 }

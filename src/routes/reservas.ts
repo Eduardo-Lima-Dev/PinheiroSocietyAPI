@@ -154,7 +154,18 @@ router.get('/:id', async (req, res) => {
   const reserva = await prisma.reserva.findUnique({
     where: { id },
     include: {
-      cliente: true,
+      cliente: {
+        select: {
+          id: true,
+          nomeCompleto: true,
+          cpf: true,
+          email: true,
+          telefone: true,
+          tipo: true,
+          createdAt: true,
+          updatedAt: true
+        }
+      },
       quadra: true
     }
   });
@@ -206,6 +217,15 @@ router.get('/:id', async (req, res) => {
  *                 type: string
  *                 format: date
  *                 description: Data limite para a recorrência (máximo 6 meses)
+ *               payment:
+ *                 type: string
+ *                 enum: [CASH, PIX, CARD]
+ *                 description: Método de pagamento
+ *               percentualPago:
+ *                 type: integer
+ *                 enum: [0, 50, 100]
+ *                 default: 0
+ *                 description: Percentual pago (0, 50 ou 100)
  *     responses:
  *       201:
  *         description: Reserva(s) criada(s)
@@ -215,7 +235,7 @@ router.get('/:id', async (req, res) => {
  *         description: Conflito de horário
  */
 router.post('/', async (req, res) => {
-  const { clienteId, quadraId, data, hora, observacoes, recorrente, diaSemana, dataFimRecorrencia } = req.body as {
+  const { clienteId, quadraId, data, hora, observacoes, recorrente, diaSemana, dataFimRecorrencia, payment, percentualPago } = req.body as {
     clienteId: number;
     quadraId: number;
     data: string;
@@ -224,6 +244,8 @@ router.post('/', async (req, res) => {
     recorrente?: boolean;
     diaSemana?: number;
     dataFimRecorrencia?: string;
+    payment?: 'CASH' | 'PIX' | 'CARD';
+    percentualPago?: number;
   };
 
   // Validações
@@ -280,6 +302,28 @@ router.post('/', async (req, res) => {
 
   // Calcular preço baseado no horário
   const precoCents = hora < 17 ? 10000 : 11000; // 100 reais até 17h, 110 reais após
+
+  // Validar e processar pagamento
+  let valorPagoCents = 0;
+  let statusPagamento: 'PENDENTE' | 'PARCIAL' | 'TOTAL' = 'PENDENTE';
+  
+  if (payment && percentualPago !== undefined) {
+    if (!['CASH', 'PIX', 'CARD'].includes(payment)) {
+      return res.status(400).json({ message: 'Método de pagamento inválido. Use CASH, PIX ou CARD' });
+    }
+    
+    if (![0, 50, 100].includes(percentualPago)) {
+      return res.status(400).json({ message: 'Percentual pago deve ser 0, 50 ou 100' });
+    }
+    
+    valorPagoCents = Math.round((precoCents * percentualPago) / 100);
+    
+    if (percentualPago === 100) {
+      statusPagamento = 'TOTAL';
+    } else if (percentualPago === 50) {
+      statusPagamento = 'PARCIAL';
+    }
+  }
 
   // Função para gerar datas de recorrência
   const gerarDatasRecorrencia = (dataInicio: Date, diaSemana: number, dataFim: Date): Date[] => {
@@ -338,7 +382,11 @@ router.post('/', async (req, res) => {
         observacoes: observacoes || null,
         recorrente: true,
         diaSemana,
-        dataFimRecorrencia: dataFim
+        dataFimRecorrencia: dataFim,
+        payment: payment || null,
+        valorPagoCents,
+        percentualPago: percentualPago || 0,
+        statusPagamento
       },
       include: {
         cliente: {
@@ -362,7 +410,11 @@ router.post('/', async (req, res) => {
             precoCents,
             observacoes: observacoes || null,
             recorrente: false,
-            reservaPaiId: reservaPai.id
+            reservaPaiId: reservaPai.id,
+            payment: payment || null,
+            valorPagoCents,
+            percentualPago: percentualPago || 0,
+            statusPagamento
           }
         })
       )
@@ -398,7 +450,11 @@ router.post('/', async (req, res) => {
         hora,
         precoCents,
         observacoes: observacoes || null,
-        recorrente: false
+        recorrente: false,
+        payment: payment || null,
+        valorPagoCents,
+        percentualPago: percentualPago || 0,
+        statusPagamento
       },
       include: {
         cliente: {
