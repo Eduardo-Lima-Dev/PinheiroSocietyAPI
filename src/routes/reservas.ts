@@ -522,6 +522,10 @@ router.post('/', async (req, res) => {
  *                 maximum: 23
  *               observacoes:
  *                 type: string
+ *               duracaoMinutos:
+ *                 type: integer
+ *                 enum: [60, 90, 120]
+ *                 description: Nova duração em minutos (opcional)
  *     responses:
  *       200:
  *         description: Reserva reagendada
@@ -534,10 +538,11 @@ router.post('/', async (req, res) => {
  */
 router.put('/:id/reagendar', async (req, res) => {
   const id = Number(req.params.id);
-  const { novaData, novaHora, observacoes } = req.body as {
+  const { novaData, novaHora, observacoes, duracaoMinutos } = req.body as {
     novaData: string;
     novaHora: number;
     observacoes?: string;
+    duracaoMinutos?: number;
   };
 
   // Validações
@@ -567,29 +572,38 @@ router.put('/:id/reagendar', async (req, res) => {
     return res.status(400).json({ message: 'Apenas reservas ativas podem ser reagendadas' });
   }
 
-  // Verificar conflito de horário (excluindo a própria reserva)
+  // Duração: permitir 60, 90, 120 (padrão: manter a duração atual ou 60)
+  const novaDuracao = duracaoMinutos !== undefined 
+    ? ([60, 90, 120].includes(duracaoMinutos) ? duracaoMinutos : reserva.duracaoMinutos || 60)
+    : (reserva.duracaoMinutos || 60);
+
+  // Verificar conflito de horário considerando a duração (excluindo a própria reserva)
+  const horasOcupadas = Array.from({ length: Math.ceil(novaDuracao / 60) }, (_, i) => novaHora + i);
   const conflito = await prisma.reserva.findFirst({
     where: {
       quadraId: reserva.quadraId,
       data: novaDataReserva,
-      hora: novaHora,
+      hora: { in: horasOcupadas },
       status: 'ATIVA',
       id: { not: id }
     }
   });
 
   if (conflito) {
-    return res.status(409).json({ message: 'Novo horário já está ocupado' });
+    return res.status(409).json({ message: 'Novo horário já está ocupado em parte do período solicitado' });
   }
 
-  // Calcular novo preço baseado no horário
-  const novoPrecoCents = novaHora < 17 ? 10000 : 11000;
+  // Calcular novo preço baseado no horário e duração
+  const precoBaseCents = novaHora < 17 ? 10000 : 11000;
+  const multiplicador = novaDuracao === 60 ? 1 : novaDuracao === 90 ? 1.5 : 2;
+  const novoPrecoCents = Math.round(precoBaseCents * multiplicador);
 
   const reservaAtualizada = await prisma.reserva.update({
     where: { id },
     data: {
       data: novaDataReserva,
       hora: novaHora,
+      duracaoMinutos: novaDuracao,
       precoCents: novoPrecoCents,
       observacoes: observacoes || reserva.observacoes
     },
