@@ -1,8 +1,13 @@
 import { Router } from 'express';
 import { processarReservasVencidas, verificarReservasVencidas } from '../services/reservas-service.js';
 import reservasJob from '../jobs/reservas-job.js';
+import { requireAuth, requireAdmin } from '../middleware/auth.js';
 
 const router = Router();
+
+// Todas as rotas administrativas requerem autenticação ADMIN
+router.use(requireAuth);
+router.use(requireAdmin);
 
 /**
  * @swagger

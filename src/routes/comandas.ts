@@ -1,7 +1,12 @@
 import { Router } from 'express';
 import { prisma } from '../lib/prisma.js';
+import { requireAuth, requireUser } from '../middleware/auth.js';
 
 const router = Router();
+
+// Todas as rotas de comandas requerem autenticação (USER ou ADMIN)
+router.use(requireAuth);
+router.use(requireUser);
 
 /**
  * @swagger

@@ -1,8 +1,13 @@
 import { Router } from 'express';
 import { prisma } from '../lib/prisma.js';
 import bcrypt from 'bcryptjs';
+import { requireAuth, requireAdmin } from '../middleware/auth.js';
 
 const router = Router();
+
+// Todas as rotas de usuários requerem autenticação ADMIN
+router.use(requireAuth);
+router.use(requireAdmin);
 
 /**
  * @swagger
