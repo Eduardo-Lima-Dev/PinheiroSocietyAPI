@@ -202,6 +202,11 @@ router.get('/:id', async (req, res) => {
  *                 type: integer
  *                 minimum: 8
  *                 maximum: 23
+ *               duracaoMinutos:
+ *                 type: integer
+ *                 enum: [60, 90, 120]
+ *                 default: 60
+ *                 description: Duração da reserva em minutos
  *               observacoes:
  *                 type: string
  *               recorrente:
@@ -216,7 +221,7 @@ router.get('/:id', async (req, res) => {
  *               dataFimRecorrencia:
  *                 type: string
  *                 format: date
- *                 description: Data limite para a recorrência (máximo 6 meses)
+ *                 description: Data limite para a recorrência (máximo 12 meses)
  *               payment:
  *                 type: string
  *                 enum: [CASH, PIX, CARD]
@@ -235,11 +240,12 @@ router.get('/:id', async (req, res) => {
  *         description: Conflito de horário
  */
 router.post('/', async (req, res) => {
-  const { clienteId, quadraId, data, hora, observacoes, recorrente, diaSemana, dataFimRecorrencia, payment, percentualPago } = req.body as {
+  const { clienteId, quadraId, data, hora, duracaoMinutos, observacoes, recorrente, diaSemana, dataFimRecorrencia, payment, percentualPago } = req.body as {
     clienteId: number;
     quadraId: number;
     data: string;
     hora: number;
+    duracaoMinutos?: number;
     observacoes?: string;
     recorrente?: boolean;
     diaSemana?: number;
@@ -271,14 +277,14 @@ router.post('/', async (req, res) => {
     return res.status(400).json({ message: 'Não é possível agendar para datas passadas' });
   }
 
-  // Validar data fim de recorrência (máximo 6 meses)
+  // Validar data fim de recorrência (máximo 12 meses)
   if (recorrente && dataFimRecorrencia) {
     const dataFim = new Date(dataFimRecorrencia + 'T23:59:59');
     const dataMaxima = new Date(dataReserva);
-    dataMaxima.setMonth(dataMaxima.getMonth() + 6);
+    dataMaxima.setMonth(dataMaxima.getMonth() + 12);
 
     if (dataFim > dataMaxima) {
-      return res.status(400).json({ message: 'A data fim da recorrência não pode ser superior a 6 meses da data inicial' });
+      return res.status(400).json({ message: 'A data fim da recorrência não pode ser superior a 12 meses da data inicial' });
     }
 
     if (dataFim <= dataReserva) {
@@ -300,8 +306,13 @@ router.post('/', async (req, res) => {
     return res.status(400).json({ message: 'Quadra não encontrada ou inativa' });
   }
 
-  // Calcular preço baseado no horário
-  const precoCents = hora < 17 ? 10000 : 11000; // 100 reais até 17h, 110 reais após
+  // Duração: permitir 60, 90, 120 (padrão 60)
+  const duracao = [60, 90, 120].includes(duracaoMinutos ?? 60) ? (duracaoMinutos ?? 60) : 60;
+
+  // Calcular preço baseado no horário e multiplicador pela duração
+  const precoBaseCents = hora < 17 ? 10000 : 11000; // 100 reais até 17h, 110 após
+  const multiplicador = duracao === 60 ? 1 : duracao === 90 ? 1.5 : 2;
+  const precoCents = Math.round(precoBaseCents * multiplicador);
 
   // Validar e processar pagamento
   let valorPagoCents = 0;
@@ -323,6 +334,21 @@ router.post('/', async (req, res) => {
     } else if (percentualPago === 50) {
       statusPagamento = 'PARCIAL';
     }
+  }
+
+  // Verificação de conflito considerando duração (bloqueia horas seguintes)
+  const horasOcupadas = Array.from({ length: Math.ceil(duracao / 60) }, (_, i) => hora + i);
+  const conflitoExistente = await prisma.reserva.findFirst({
+    where: {
+      quadraId,
+      data: dataReserva,
+      hora: { in: horasOcupadas },
+      status: 'ATIVA'
+    }
+  });
+
+  if (conflitoExistente) {
+    return res.status(409).json({ message: 'Horário já está ocupado em parte do período solicitado' });
   }
 
   // Função para gerar datas de recorrência
@@ -358,7 +384,7 @@ router.post('/', async (req, res) => {
       where: {
         quadraId,
         data: { in: datasRecorrencia },
-        hora,
+        hora: { in: horasOcupadas },
         status: 'ATIVA'
       },
       select: { data: true }
@@ -379,6 +405,7 @@ router.post('/', async (req, res) => {
         data: dataReserva,
         hora,
         precoCents,
+        duracaoMinutos: duracao,
         observacoes: observacoes || null,
         recorrente: true,
         diaSemana,
@@ -408,6 +435,7 @@ router.post('/', async (req, res) => {
             data,
             hora,
             precoCents,
+            duracaoMinutos: duracao,
             observacoes: observacoes || null,
             recorrente: false,
             reservaPaiId: reservaPai.id,
@@ -429,18 +457,7 @@ router.post('/', async (req, res) => {
 
   } else {
     // Criar reserva única (lógica original)
-    const conflito = await prisma.reserva.findFirst({
-      where: {
-        quadraId,
-        data: dataReserva,
-        hora,
-        status: 'ATIVA'
-      }
-    });
-
-    if (conflito) {
-      return res.status(409).json({ message: 'Horário já está ocupado' });
-    }
+    // Conflito único (não recorrente) já verificado acima com horasOcupadas
 
     const reserva = await prisma.reserva.create({
       data: {
@@ -449,6 +466,7 @@ router.post('/', async (req, res) => {
         data: dataReserva,
         hora,
         precoCents,
+        duracaoMinutos: duracao,
         observacoes: observacoes || null,
         recorrente: false,
         payment: payment || null,

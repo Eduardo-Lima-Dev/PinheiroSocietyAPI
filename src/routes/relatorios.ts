@@ -388,8 +388,24 @@ router.get('/dashboard', async (req, res) => {
     }
   });
 
+  // Incluir reservas do dia na receita: considerar reservas ATIVAS e CONCLUIDAS
+  // Para refletir a visão operacional do caixa do dia, usamos precoCents
+  // (se preferir, podemos somar apenas valorPagoCents)
+  const reservasHojeParaReceita = await prisma.reserva.findMany({
+    where: {
+      data: {
+        gte: hojeInicio,
+        lte: hojeFim
+      },
+      status: { in: ['ATIVA', 'CONCLUIDA'] }
+    },
+    select: { precoCents: true }
+  });
+
+  const receitaReservasHoje = reservasHojeParaReceita.reduce((acc, r) => acc + r.precoCents, 0);
   const receitaHoje = comandasHoje.reduce((acc, c) => acc + c.totalCents, 0) + 
-                     lancamentosHoje.reduce((acc, l) => acc + l.totalCents, 0);
+                     lancamentosHoje.reduce((acc, l) => acc + l.totalCents, 0) +
+                     receitaReservasHoje;
 
   // Calcular média dos últimos 30 dias
   const data30DiasAtras = new Date(hoje);
@@ -414,8 +430,21 @@ router.get('/dashboard', async (req, res) => {
     }
   });
 
+  // Reservas concluídas nos últimos 30 dias (para média histórica)
+  const reservas30DiasConcluidas = await prisma.reserva.findMany({
+    where: {
+      data: {
+        gte: data30DiasAtras,
+        lte: hojeFim
+      },
+      status: 'CONCLUIDA'
+    },
+    select: { precoCents: true }
+  });
+
   const receita30Dias = comandas30Dias.reduce((acc, c) => acc + c.totalCents, 0) + 
-                       lancamentos30Dias.reduce((acc, l) => acc + l.totalCents, 0);
+                       lancamentos30Dias.reduce((acc, l) => acc + l.totalCents, 0) +
+                       reservas30DiasConcluidas.reduce((acc, r) => acc + r.precoCents, 0);
   
   const mediaDiaria30Dias = receita30Dias / 30;
   const variacao = mediaDiaria30Dias > 0 ? 

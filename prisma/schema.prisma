@@ -83,6 +83,7 @@ model Reserva {
   quadraId             Int
   data                 DateTime
   hora                 Int
+  duracaoMinutos       Int             @default(60)
   precoCents           Int
   status               ReservaStatus   @default(ATIVA)
   observacoes          String?
@@ -100,8 +101,6 @@ model Reserva {
   quadra               Quadra         @relation(fields: [quadraId], references: [id])
   reservaPai           Reserva?       @relation("ReservaRecorrencia", fields: [reservaPaiId], references: [id])
   reservasFilhas       Reserva[]      @relation("ReservaRecorrencia")
-
-  @@unique([data, hora, quadraId])
 }
 
 
