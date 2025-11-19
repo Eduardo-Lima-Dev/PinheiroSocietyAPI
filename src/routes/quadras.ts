@@ -20,27 +20,73 @@ router.use(requireUser);
  * /quadras:
  *   get:
  *     tags: [Quadras]
- *     summary: Lista todas as quadras
+ *     summary: Lista quadras com busca e paginação
  *     parameters:
  *       - in: query
  *         name: ativa
  *         required: false
  *         schema:
  *           type: boolean
+ *       - in: query
+ *         name: q
+ *         required: false
+ *         schema:
+ *           type: string
+ *         description: Busca por nome da quadra
+ *       - in: query
+ *         name: page
+ *         required: false
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *       - in: query
+ *         name: pageSize
+ *         required: false
+ *         schema:
+ *           type: integer
+ *           default: 10
  *     responses:
  *       200:
- *         description: Lista de quadras
+ *         description: Lista de quadras com paginação
  */
 router.get('/', async (req, res) => {
-  const { ativa } = req.query as { ativa?: string };
-  const where = typeof ativa === 'undefined' ? {} : { ativa: ativa === 'true' };
-  
-  const quadras = await prisma.quadra.findMany({
-    where,
-    orderBy: { nome: 'asc' }
+  const { ativa, q, page = '1', pageSize = '10' } = req.query as {
+    ativa?: string;
+    q?: string;
+    page?: string;
+    pageSize?: string;
+  };
+
+  const pageNumber = Math.max(1, Number(page) || 1);
+  const sizeNumber = Math.min(100, Math.max(1, Number(pageSize) || 10));
+
+  const where: Record<string, unknown> = {};
+  if (typeof ativa !== 'undefined') {
+    where.ativa = ativa === 'true';
+  }
+  if (q && q.trim().length > 0) {
+    where.nome = { contains: q.trim(), mode: 'insensitive' as const };
+  }
+
+  const [total, quadras] = await Promise.all([
+    prisma.quadra.count({ where }),
+    prisma.quadra.findMany({
+      where,
+      orderBy: { nome: 'asc' },
+      skip: (pageNumber - 1) * sizeNumber,
+      take: sizeNumber
+    })
+  ]);
+
+  res.json({
+    data: quadras,
+    pagination: {
+      total,
+      page: pageNumber,
+      pageSize: sizeNumber,
+      totalPages: Math.ceil(total / sizeNumber)
+    }
   });
-  
-  res.json(quadras);
 });
 
 /**
