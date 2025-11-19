@@ -20,26 +20,57 @@ router.use(requireUser);
  * /clientes:
  *   get:
  *     tags: [Clientes]
- *     summary: Lista todos os clientes
+ *     summary: Lista clientes com paginação
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *       - in: query
+ *         name: pageSize
+ *         schema:
+ *           type: integer
+ *           default: 10
  *     responses:
  *       200:
- *         description: Lista de clientes
+ *         description: Lista de clientes paginada
  */
-router.get('/', async (_req, res) => {
-  const clientes = await prisma.cliente.findMany({
-    select: {
-      id: true,
-      nomeCompleto: true,
-      cpf: true,
-      email: true,
-      telefone: true,
-      tipo: true,
-      createdAt: true,
-      updatedAt: true
-    },
-    orderBy: { nomeCompleto: 'asc' }
+router.get('/', async (req, res) => {
+  const { page = '1', pageSize = '10' } = req.query;
+  const pageNumber = Math.max(1, Number(page) || 1);
+  const sizeNumber = Math.min(100, Math.max(1, Number(pageSize) || 10));
+
+  const clienteSelect = {
+    id: true,
+    nomeCompleto: true,
+    cpf: true,
+    email: true,
+    telefone: true,
+    tipo: true,
+    createdAt: true,
+    updatedAt: true
+  } as const;
+
+  const [total, clientes] = await Promise.all([
+    prisma.cliente.count(),
+    prisma.cliente.findMany({
+      select: clienteSelect,
+      orderBy: { nomeCompleto: 'asc' },
+      skip: (pageNumber - 1) * sizeNumber,
+      take: sizeNumber
+    })
+  ]);
+
+  res.json({
+    data: clientes,
+    pagination: {
+      total,
+      page: pageNumber,
+      pageSize: sizeNumber,
+      totalPages: Math.ceil(total / sizeNumber)
+    }
   });
-  res.json(clientes);
 });
 
 /**
@@ -322,45 +353,75 @@ router.delete('/:id', async (req, res) => {
  * /clientes/buscar:
  *   get:
  *     tags: [Clientes]
- *     summary: Busca clientes por CPF, nome ou email
+ *     summary: Busca clientes por CPF, nome ou email com paginação
  *     parameters:
  *       - in: query
  *         name: q
  *         required: true
  *         schema:
  *           type: string
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *       - in: query
+ *         name: pageSize
+ *         schema:
+ *           type: integer
+ *           default: 10
  *     responses:
  *       200:
- *         description: Lista de clientes encontrados
+ *         description: Lista de clientes encontrados com paginação
  */
 router.get('/buscar', async (req, res) => {
-  const { q } = req.query as { q: string };
+  const { q, page = '1', pageSize = '10' } = req.query;
+  const pageNumber = Math.max(1, Number(page) || 1);
+  const sizeNumber = Math.min(100, Math.max(1, Number(pageSize) || 10));
 
-  if (!q || q.trim().length < 2) {
+  if (!q || (typeof q === 'string' && q.trim().length < 2)) {
     return res.status(400).json({ message: 'Termo de busca deve ter pelo menos 2 caracteres' });
   }
 
-  const clientes = await prisma.cliente.findMany({
-    where: {
-      OR: [
-        { nomeCompleto: { contains: q, mode: 'insensitive' } },
-        { cpf: { contains: q } },
-        { email: { contains: q, mode: 'insensitive' } }
-      ]
-    },
-    select: {
-      id: true,
-      nomeCompleto: true,
-      cpf: true,
-      email: true,
-      telefone: true,
-      tipo: true
-    },
-    orderBy: { nomeCompleto: 'asc' },
-    take: 20
-  });
+  const term = typeof q === 'string' ? q.trim() : '';
 
-  res.json(clientes);
+  const where = {
+    OR: [
+      { nomeCompleto: { contains: term, mode: 'insensitive' as const } },
+      { cpf: { contains: term } },
+      { email: { contains: term, mode: 'insensitive' as const } }
+    ]
+  };
+
+  const clienteSelect = {
+    id: true,
+    nomeCompleto: true,
+    cpf: true,
+    email: true,
+    telefone: true,
+    tipo: true
+  } as const;
+
+  const [total, clientes] = await Promise.all([
+    prisma.cliente.count({ where }),
+    prisma.cliente.findMany({
+      where,
+      select: clienteSelect,
+      orderBy: { nomeCompleto: 'asc' },
+      skip: (pageNumber - 1) * sizeNumber,
+      take: sizeNumber
+    })
+  ]);
+
+  res.json({
+    data: clientes,
+    pagination: {
+      total,
+      page: pageNumber,
+      pageSize: sizeNumber,
+      totalPages: Math.ceil(total / sizeNumber)
+    }
+  });
 });
 
 export default router;
