@@ -68,6 +68,7 @@ model Produto {
   comandaItems ComandaItem[]
   lancamentoItems LancamentoItem[]
   estoque      Estoque?
+  movimentacoes MovimentacaoEstoque[]
 }
 
 model Estoque {
@@ -77,6 +78,19 @@ model Estoque {
   minQuantidade Int      @default(0)
   updatedAt     DateTime @updatedAt
   produto       Produto  @relation(fields: [produtoId], references: [id])
+}
+
+model MovimentacaoEstoque {
+  id                Int                @id @default(autoincrement())
+  produtoId         Int
+  tipo              MovimentacaoTipo
+  quantidade        Int
+  quantidadeAntes   Int
+  quantidadeDepois  Int
+  observacao        String?
+  createdAt         DateTime           @default(now())
+
+  produto           Produto            @relation(fields: [produtoId], references: [id])
 }
 
 model Reserva {
@@ -193,4 +207,9 @@ enum PagamentoStatus {
   PENDENTE
   PARCIAL
   TOTAL
+}
+
+enum MovimentacaoTipo {
+  ENTRADA
+  SAIDA
 }
