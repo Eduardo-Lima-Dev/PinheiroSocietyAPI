@@ -8,6 +8,7 @@ API completa para gestão da Pinheiro Society - sistema de reservas, comandas, c
 - Criação de usuários com roles (ADMIN/USER)
 - Login de administradores com JWT
 - Senhas criptografadas com bcrypt
+- Recuperação de senha por email
 
 ### 👤 **Gestão de Clientes**
 - Cadastro completo de clientes (nome, CPF, email, telefone)
@@ -77,7 +78,56 @@ API completa para gestão da Pinheiro Society - sistema de reservas, comandas, c
    DATABASE_URL="postgresql://usuario:senha@localhost:5432/pinheiro_society"
    JWT_SECRET="seu-jwt-secret-aqui"
    PORT=3000
+   
+   # Configurações de email para recuperação de senha
+   SMTP_HOST="smtp.gmail.com"
+   SMTP_PORT=587
+   SMTP_USER="autenticacaoc@gmail.com"  # Email usado para autenticação SMTP
+   SMTP_PASS="sua-senha-de-app"  # Use senha de app do Gmail
+   SMTP_FROM="autenticacaoc@gmail.com"  # Opcional, usa SMTP_USER se não definido
+   FRONTEND_URL="http://localhost:3000"  # URL do frontend para links de recuperação
+   NODE_ENV="development"  # Em desenvolvimento, todos os emails são redirecionados para limaduduh34@gmail.com
    ```
+   
+   **Nota:** Em modo de desenvolvimento (`NODE_ENV !== 'production'`), todos os emails são automaticamente redirecionados para `limaduduh34@gmail.com`, mas a autenticação SMTP continua usando o email configurado em `SMTP_USER`.
+
+### 📧 **Como obter a Senha de Aplicativo do Gmail (SMTP_PASS)**
+
+Para usar o Gmail como servidor SMTP, você precisa criar uma **Senha de Aplicativo**. Siga estes passos:
+
+1. **Ative a Verificação em Duas Etapas** (obrigatório)
+   - Acesse: https://myaccount.google.com/security
+   - Role até "Como fazer login no Google"
+   - Clique em "Verificação em duas etapas"
+   - Siga as instruções para ativar (pode usar autenticação por app, SMS ou email)
+
+2. **Crie uma Senha de Aplicativo**
+   - Acesse: https://myaccount.google.com/apppasswords
+   - Ou vá em: Conta Google → Segurança → Verificação em duas etapas → Senhas de app
+   - Selecione "App": escolha "Outro (nome personalizado)"
+   - Digite um nome (ex: "PinheiroSocietyAPI")
+   - Clique em "Gerar"
+
+3. **Copie a Senha Gerada**
+   - O Google mostrará uma senha de 16 caracteres (sem espaços)
+   - Exemplo: `abcd efgh ijkl mnop`
+   - **Copie essa senha completa** (sem os espaços ou remova os espaços manualmente)
+   - Essa é a senha que você deve usar no `SMTP_PASS`
+
+4. **Configure no .env**
+   ```env
+   SMTP_USER="autenticacaoc@gmail.com"
+   SMTP_PASS="abcdefghijklmnop"  # Cole a senha de 16 caracteres aqui (sem espaços)
+   ```
+
+**⚠️ Importante:**
+- A senha de aplicativo é diferente da sua senha normal do Gmail
+- Você só verá a senha uma vez - guarde-a com segurança
+- Se perder, você precisará gerar uma nova
+- Cada aplicativo pode ter sua própria senha de aplicativo
+
+**🔒 Alternativa (menos seguro):**
+Se não quiser usar verificação em duas etapas, você pode ativar "Acesso a apps menos seguros" nas configurações do Google, mas isso não é recomendado por questões de segurança.
 
 4. **Execute as migrações**
    ```bash
@@ -129,8 +179,10 @@ src/
 ├── lib/
 │   └── prisma.ts           # Conexão com banco
 ├── routes/
-│   ├── auth.ts             # Autenticação (login)
+│   ├── auth.ts             # Autenticação (login, recuperação de senha)
 │   ├── users.ts            # Gestão de usuários
+├── services/
+│   └── email-service.ts    # Serviço de envio de emails
 │   ├── clientes.ts         # Gestão de clientes
 │   ├── quadras.ts          # Gestão de quadras
 │   ├── reservas.ts         # Gestão de reservas
@@ -199,6 +251,82 @@ POST /auth/login
   "user": { "id": 1, "name": "Admin", "email": "admin@...", "role": "ADMIN" }
 }
 ```
+
+### **Recuperação de Senha**
+
+O fluxo de recuperação de senha possui 3 etapas:
+
+#### 1. Solicitar recuperação de senha (envia código de 6 dígitos)
+```bash
+POST /auth/forgot-password
+{
+  "email": "usuario@pinheirosociety.com"
+}
+```
+
+**Resposta:**
+```json
+{
+  "message": "Se o email estiver cadastrado, você receberá um email com código de verificação."
+}
+```
+
+O sistema enviará um email com um **código de 6 dígitos** (ex: `123456`). Este código expira em 1 hora.
+
+#### 2. Verificar código de verificação
+```bash
+POST /auth/verify-code
+{
+  "email": "usuario@pinheirosociety.com",
+  "code": "123456"
+}
+```
+
+**Resposta (sucesso):**
+```json
+{
+  "message": "Código verificado com sucesso",
+  "resetToken": "jwt-token-temporario-aqui"
+}
+```
+
+**Resposta (erro):**
+```json
+{
+  "message": "Código inválido ou expirado. Verifique se o código está correto e se não expirou (válido por 1 hora)"
+}
+```
+
+**Nota:** 
+- O código de verificação expira em 1 hora
+- O código deve conter exatamente 6 dígitos numéricos (000000 a 999999)
+- Após verificar o código, você receberá um `resetToken` válido por 15 minutos
+- O código é invalidado após ser verificado (não pode ser reutilizado)
+
+#### 3. Redefinir senha com token de reset
+```bash
+POST /auth/reset-password
+{
+  "resetToken": "jwt-token-temporario-aqui",
+  "newPassword": "novaSenha123"
+}
+```
+
+**Resposta:**
+```json
+{
+  "message": "Senha redefinida com sucesso"
+}
+```
+
+**Erros possíveis:**
+- `400`: Token de reset e nova senha são obrigatórios
+- `400`: A senha deve ter no mínimo 6 caracteres
+- `401`: Token inválido ou expirado (válido por 15 minutos)
+
+**Nota:** 
+- O `resetToken` expira em 15 minutos após a verificação do código
+- Para usar Gmail, você precisará criar uma "Senha de App" nas configurações de segurança da sua conta Google
 
 ## 💰 Sistema Monetário
 
