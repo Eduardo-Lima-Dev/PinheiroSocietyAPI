@@ -646,6 +646,53 @@ router.get('/reservas', async (req, res) => {
     .filter(r => r.status === 'CONCLUIDA')
     .reduce((acc, r) => acc + r.precoCents, 0);
 
+  // Top Clientes com receita
+  const clientesMap = new Map<number, { nome: string; reservas: number; receita: number }>();
+  
+  reservas.forEach(r => {
+    const clienteId = r.clienteId;
+    if (!clientesMap.has(clienteId)) {
+      clientesMap.set(clienteId, {
+        nome: r.cliente.nomeCompleto,
+        reservas: 0,
+        receita: 0
+      });
+    }
+    const cliente = clientesMap.get(clienteId)!;
+    cliente.reservas += 1;
+    if (r.status === 'CONCLUIDA') {
+      cliente.receita += r.precoCents;
+    }
+  });
+
+  const topClientes = Array.from(clientesMap.values())
+    .sort((a, b) => b.reservas - a.reservas)
+    .slice(0, 10)
+    .map(c => ({
+      cliente: c.nome,
+      reservas: c.reservas,
+      receita: c.receita
+    }));
+
+  // Horários mais reservados por faixa
+  const faixasHorario = [
+    { inicio: 8, fim: 12, label: '08:00-12:00' },
+    { inicio: 12, fim: 17, label: '12:00-17:00' },
+    { inicio: 17, fim: 23, label: '17:00-23:00' }
+  ];
+
+  const horariosPorFaixa = faixasHorario.map(faixa => {
+    const reservasNaFaixa = reservas.filter(r => r.hora >= faixa.inicio && r.hora < faixa.fim);
+    const reservasConcluidas = reservasNaFaixa.filter(r => r.status === 'CONCLUIDA');
+    const receita = reservasConcluidas.reduce((acc, r) => acc + r.precoCents, 0);
+
+    return {
+      horario: faixa.label,
+      reservas: reservasNaFaixa.length,
+      receita
+    };
+  });
+
   // Verificar se há reservas no período
   if (reservas.length === 0) {
     return res.json({
@@ -656,6 +703,8 @@ router.get('/reservas', async (req, res) => {
       porQuadra: {},
       porHorario: {},
       faturamentoTotal: 0,
+      topClientes: [],
+      horariosMaisReservados: [],
       reservas: []
     });
   }
@@ -667,6 +716,8 @@ router.get('/reservas', async (req, res) => {
     porQuadra,
     porHorario,
     faturamentoTotal,
+    topClientes,
+    horariosMaisReservados: horariosPorFaixa,
     reservas: reservas.map(r => ({
       id: r.id,
       data: r.data,
@@ -829,6 +880,517 @@ router.get('/estoque', async (req, res) => {
          p.estoque.quantidade <= p.estoque.minQuantidade ? 'ESTOQUE_BAIXO' : 'NORMAL') : 
         'SEM_CONTROLE'
     }))
+  });
+});
+
+/**
+ * @swagger
+ * /relatorios/financeiro:
+ *   get:
+ *     tags: [Relatórios]
+ *     summary: Relatório financeiro com receita separada por Quadras e Bar
+ *     parameters:
+ *       - in: query
+ *         name: dataInicio
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: date
+ *       - in: query
+ *         name: dataFim
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: date
+ *     responses:
+ *       200:
+ *         description: Relatório financeiro com receita por categoria
+ */
+router.get('/financeiro', async (req, res) => {
+  const { dataInicio, dataFim } = req.query;
+  
+  if (!dataInicio || !dataFim) {
+    return res.status(400).json({ message: 'dataInicio e dataFim são obrigatórios' });
+  }
+
+  const dataInicioStr = String(dataInicio).trim();
+  const dataFimStr = String(dataFim).trim();
+
+  const formatoData = /^\d{4}-\d{2}-\d{2}$/;
+  if (!formatoData.test(dataInicioStr) || !formatoData.test(dataFimStr)) {
+    return res.status(400).json({ message: 'Formato de data inválido. Use YYYY-MM-DD' });
+  }
+
+  const inicio = new Date(dataInicioStr + 'T00:00:00');
+  const fim = new Date(dataFimStr + 'T23:59:59');
+
+  if (isNaN(inicio.getTime()) || isNaN(fim.getTime())) {
+    return res.status(400).json({ message: 'Formato de data inválido. Use YYYY-MM-DD' });
+  }
+
+  // Receita de Quadras (reservas concluídas)
+  const reservasQuadras = await prisma.reserva.findMany({
+    where: {
+      data: {
+        gte: inicio,
+        lte: fim
+      },
+      status: 'CONCLUIDA'
+    },
+    select: { precoCents: true }
+  });
+
+  const receitaQuadras = reservasQuadras.reduce((acc, r) => acc + r.precoCents, 0);
+
+  // Receita de Bar (comandas + lançamentos)
+  const comandas = await prisma.comanda.findMany({
+    where: {
+      closedAt: {
+        gte: inicio,
+        lte: fim
+      },
+      payment: { not: null }
+    }
+  });
+
+  const lancamentos = await prisma.lancamento.findMany({
+    where: {
+      createdAt: {
+        gte: inicio,
+        lte: fim
+      }
+    }
+  });
+
+  const receitaBar = comandas.reduce((acc, c) => acc + c.totalCents, 0) +
+                    lancamentos.reduce((acc, l) => acc + l.totalCents, 0);
+
+  const receitaTotal = receitaQuadras + receitaBar;
+
+  // Calcular percentuais
+  const percentualQuadras = receitaTotal > 0 ? (receitaQuadras / receitaTotal) * 100 : 0;
+  const percentualBar = receitaTotal > 0 ? (receitaBar / receitaTotal) * 100 : 0;
+
+  // Total de reservas no período
+  const totalReservas = await prisma.reserva.count({
+    where: {
+      data: {
+        gte: inicio,
+        lte: fim
+      }
+    }
+  });
+
+  const mediaReservas = totalReservas > 0 ? Math.round(receitaQuadras / totalReservas) : 0;
+
+  res.json({
+    periodo: { dataInicio: dataInicioStr, dataFim: dataFimStr },
+    receitaTotal,
+    receitaQuadras: {
+      totalCents: receitaQuadras,
+      percentual: Math.round(percentualQuadras * 10) / 10
+    },
+    receitaBar: {
+      totalCents: receitaBar,
+      percentual: Math.round(percentualBar * 10) / 10
+    },
+    totalReservas,
+    mediaReservas,
+    distribuicao: {
+      quadras: {
+        totalCents: receitaQuadras,
+        percentual: Math.round(percentualQuadras * 10) / 10
+      },
+      bar: {
+        totalCents: receitaBar,
+        percentual: Math.round(percentualBar * 10) / 10
+      }
+    }
+  });
+});
+
+/**
+ * @swagger
+ * /relatorios/reservas-detalhado:
+ *   get:
+ *     tags: [Relatórios]
+ *     summary: Relatório detalhado de reservas com top clientes e horários por faixa
+ *     parameters:
+ *       - in: query
+ *         name: dataInicio
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: date
+ *       - in: query
+ *         name: dataFim
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: date
+ *     responses:
+ *       200:
+ *         description: Relatório detalhado de reservas
+ */
+router.get('/reservas-detalhado', async (req, res) => {
+  const { dataInicio, dataFim } = req.query;
+  
+  if (!dataInicio || !dataFim) {
+    return res.status(400).json({ message: 'dataInicio e dataFim são obrigatórios' });
+  }
+
+  const dataInicioStr = Array.isArray(dataInicio) ? String(dataInicio[0]) : String(dataInicio);
+  const dataFimStr = Array.isArray(dataFim) ? String(dataFim[0]) : String(dataFim);
+  
+  const dataInicioLimpa = dataInicioStr.trim();
+  const dataFimLimpa = dataFimStr.trim();
+
+  const formatoData = /^\d{4}-\d{2}-\d{2}$/;
+  if (!formatoData.test(dataInicioLimpa) || !formatoData.test(dataFimLimpa)) {
+    return res.status(400).json({ message: 'Formato de data inválido. Use YYYY-MM-DD' });
+  }
+
+  const inicio = new Date(dataInicioLimpa + 'T00:00:00');
+  const fim = new Date(dataFimLimpa + 'T23:59:59');
+
+  if (isNaN(inicio.getTime()) || isNaN(fim.getTime())) {
+    return res.status(400).json({ message: 'Formato de data inválido. Use YYYY-MM-DD' });
+  }
+
+  const reservas = await prisma.reserva.findMany({
+    where: {
+      data: {
+        gte: inicio,
+        lte: fim
+      }
+    },
+    include: {
+      cliente: { select: { nomeCompleto: true } }
+    }
+  });
+
+  // Top Clientes com receita
+  const clientesMap = new Map<number, { nome: string; reservas: number; receita: number }>();
+  
+  reservas.forEach(r => {
+    const clienteId = r.clienteId;
+    if (!clientesMap.has(clienteId)) {
+      clientesMap.set(clienteId, {
+        nome: r.cliente.nomeCompleto,
+        reservas: 0,
+        receita: 0
+      });
+    }
+    const cliente = clientesMap.get(clienteId)!;
+    cliente.reservas += 1;
+    if (r.status === 'CONCLUIDA') {
+      cliente.receita += r.precoCents;
+    }
+  });
+
+  const topClientes = Array.from(clientesMap.values())
+    .sort((a, b) => b.reservas - a.reservas)
+    .slice(0, 10)
+    .map(c => ({
+      cliente: c.nome,
+      reservas: c.reservas,
+      receita: c.receita
+    }));
+
+  // Horários mais reservados por faixa
+  const faixasHorario = [
+    { inicio: 8, fim: 12, label: '08:00-12:00' },
+    { inicio: 12, fim: 17, label: '12:00-17:00' },
+    { inicio: 17, fim: 23, label: '17:00-23:00' }
+  ];
+
+  const horariosPorFaixa = faixasHorario.map(faixa => {
+    const reservasNaFaixa = reservas.filter(r => r.hora >= faixa.inicio && r.hora < faixa.fim);
+    const reservasConcluidas = reservasNaFaixa.filter(r => r.status === 'CONCLUIDA');
+    const receita = reservasConcluidas.reduce((acc, r) => acc + r.precoCents, 0);
+
+    return {
+      horario: faixa.label,
+      reservas: reservasNaFaixa.length,
+      receita
+    };
+  });
+
+  res.json({
+    periodo: { dataInicio: dataInicioLimpa, dataFim: dataFimLimpa },
+    topClientes,
+    horariosMaisReservados: horariosPorFaixa
+  });
+});
+
+/**
+ * @swagger
+ * /relatorios/bar:
+ *   get:
+ *     tags: [Relatórios]
+ *     summary: Relatório de bar com produtos mais vendidos e participação percentual
+ *     parameters:
+ *       - in: query
+ *         name: dataInicio
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: date
+ *       - in: query
+ *         name: dataFim
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: date
+ *     responses:
+ *       200:
+ *         description: Relatório de bar
+ */
+router.get('/bar', async (req, res) => {
+  const { dataInicio, dataFim } = req.query;
+  
+  if (!dataInicio || !dataFim) {
+    return res.status(400).json({ message: 'dataInicio e dataFim são obrigatórios' });
+  }
+
+  const dataInicioStr = String(dataInicio).trim();
+  const dataFimStr = String(dataFim).trim();
+
+  const formatoData = /^\d{4}-\d{2}-\d{2}$/;
+  if (!formatoData.test(dataInicioStr) || !formatoData.test(dataFimStr)) {
+    return res.status(400).json({ message: 'Formato de data inválido. Use YYYY-MM-DD' });
+  }
+
+  const inicio = new Date(dataInicioStr + 'T00:00:00');
+  const fim = new Date(dataFimStr + 'T23:59:59');
+
+  if (isNaN(inicio.getTime()) || isNaN(fim.getTime())) {
+    return res.status(400).json({ message: 'Formato de data inválido. Use YYYY-MM-DD' });
+  }
+
+  // Buscar comandas e lançamentos do período
+  const comandas = await prisma.comanda.findMany({
+    where: {
+      closedAt: {
+        gte: inicio,
+        lte: fim
+      },
+      payment: { not: null }
+    },
+    include: {
+      items: {
+        include: {
+          produto: true
+        }
+      }
+    }
+  });
+
+  const lancamentos = await prisma.lancamento.findMany({
+    where: {
+      createdAt: {
+        gte: inicio,
+        lte: fim
+      }
+    },
+    include: {
+      items: {
+        include: {
+          produto: true
+        }
+      }
+    }
+  });
+
+  // Agrupar produtos vendidos
+  const produtosMap = new Map<number | string, {
+    produto: string;
+    quantidade: number;
+    receita: number;
+    produtoId: number | null;
+  }>();
+
+  // Processar itens de comandas
+  comandas.forEach(c => {
+    c.items.forEach(item => {
+      const key = item.produtoId || `custom_${item.description}`;
+      if (!produtosMap.has(key)) {
+        produtosMap.set(key, {
+          produto: item.description,
+          quantidade: 0,
+          receita: 0,
+          produtoId: item.produtoId
+        });
+      }
+      const produto = produtosMap.get(key)!;
+      produto.quantidade += item.quantity;
+      produto.receita += item.quantity * item.unitCents;
+    });
+  });
+
+  // Processar itens de lançamentos
+  lancamentos.forEach(l => {
+    l.items.forEach(item => {
+      const key = item.produtoId || `custom_${item.description}`;
+      if (!produtosMap.has(key)) {
+        produtosMap.set(key, {
+          produto: item.description,
+          quantidade: 0,
+          receita: 0,
+          produtoId: item.produtoId
+        });
+      }
+      const produto = produtosMap.get(key)!;
+      produto.quantidade += item.quantity;
+      produto.receita += item.quantity * item.unitCents;
+    });
+  });
+
+  // Calcular receita total
+  const receitaTotal = Array.from(produtosMap.values()).reduce((acc, p) => acc + p.receita, 0);
+
+  // Produtos mais vendidos com participação percentual
+  const produtosMaisVendidos = Array.from(produtosMap.values())
+    .map(p => ({
+      produto: p.produto,
+      quantidade: p.quantidade,
+      receita: p.receita,
+      participacao: receitaTotal > 0 ? Math.round((p.receita / receitaTotal) * 1000) / 10 : 0
+    }))
+    .sort((a, b) => b.receita - a.receita);
+
+  res.json({
+    periodo: { dataInicio: dataInicioStr, dataFim: dataFimStr },
+    receitaTotal,
+    produtosMaisVendidos
+  });
+});
+
+/**
+ * @swagger
+ * /relatorios/movimentacao-estoque:
+ *   get:
+ *     tags: [Relatórios]
+ *     summary: Relatório de movimentação de estoque com vendidos, restante e status
+ *     parameters:
+ *       - in: query
+ *         name: dataInicio
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: date
+ *       - in: query
+ *         name: dataFim
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: date
+ *     responses:
+ *       200:
+ *         description: Relatório de movimentação de estoque
+ */
+router.get('/movimentacao-estoque', async (req, res) => {
+  const { dataInicio, dataFim } = req.query;
+  
+  if (!dataInicio || !dataFim) {
+    return res.status(400).json({ message: 'dataInicio e dataFim são obrigatórios' });
+  }
+
+  const dataInicioStr = String(dataInicio).trim();
+  const dataFimStr = String(dataFim).trim();
+
+  const formatoData = /^\d{4}-\d{2}-\d{2}$/;
+  if (!formatoData.test(dataInicioStr) || !formatoData.test(dataFimStr)) {
+    return res.status(400).json({ message: 'Formato de data inválido. Use YYYY-MM-DD' });
+  }
+
+  const inicio = new Date(dataInicioStr + 'T00:00:00');
+  const fim = new Date(dataFimStr + 'T23:59:59');
+
+  if (isNaN(inicio.getTime()) || isNaN(fim.getTime())) {
+    return res.status(400).json({ message: 'Formato de data inválido. Use YYYY-MM-DD' });
+  }
+
+  // Buscar produtos com estoque
+  const produtos = await prisma.produto.findMany({
+    where: { active: true },
+    include: { estoque: true }
+  });
+
+  // Buscar itens vendidos no período (apenas produtos com ID)
+  const comandas = await prisma.comanda.findMany({
+    where: {
+      closedAt: {
+        gte: inicio,
+        lte: fim
+      },
+      payment: { not: null }
+    },
+    include: {
+      items: {
+        where: {
+          produtoId: { not: null }
+        }
+      }
+    }
+  });
+
+  const lancamentos = await prisma.lancamento.findMany({
+    where: {
+      createdAt: {
+        gte: inicio,
+        lte: fim
+      }
+    },
+    include: {
+      items: {
+        where: {
+          produtoId: { not: null }
+        }
+      }
+    }
+  });
+
+  // Calcular quantidade vendida por produto
+  const vendidosMap = new Map<number, number>();
+
+  comandas.forEach(c => {
+    c.items.forEach(item => {
+      if (item.produtoId) {
+        vendidosMap.set(item.produtoId, (vendidosMap.get(item.produtoId) || 0) + item.quantity);
+      }
+    });
+  });
+
+  lancamentos.forEach(l => {
+    l.items.forEach(item => {
+      if (item.produtoId) {
+        vendidosMap.set(item.produtoId, (vendidosMap.get(item.produtoId) || 0) + item.quantity);
+      }
+    });
+  });
+
+  // Montar relatório de movimentação
+  const movimentacao = produtos
+    .filter(p => p.estoque) // Apenas produtos com controle de estoque
+    .map(p => {
+      const vendidos = vendidosMap.get(p.id) || 0;
+      const restante = p.estoque!.quantidade;
+      const status = restante === 0 ? 'SEM_ESTOQUE' :
+                     restante <= p.estoque!.minQuantidade ? 'ESTOQUE_BAIXO' : 'OK';
+
+      return {
+        produto: p.name,
+        vendidos,
+        restante,
+        status
+      };
+    })
+    .sort((a, b) => b.vendidos - a.vendidos); // Ordenar por mais vendidos
+
+  res.json({
+    periodo: { dataInicio: dataInicioStr, dataFim: dataFimStr },
+    movimentacao
   });
 });
 
